@@ -1,0 +1,25 @@
+{
+  "name": "@exness/bus",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0"
+  },
+  "dependencies": {
+    "@exness/config": "workspace:*",
+    "@exness/logger": "workspace:*",
+    "ioredis": "5.10.1"
+  },
+  "devDependencies": {
+    "@exness/eslint-config": "workspace:*",
+    "@exness/typescript-config": "workspace:*",
+    "@types/node": "24.11.1",
+    "eslint": "10.2.1",
+    "typescript": "6.0.3"
+  }
+}
