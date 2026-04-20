@@ -1,5 +1,5 @@
 import { env } from '@exness/config';
-import { PrismaClient } from '.prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 let cached: PrismaClient | undefined;
 
@@ -13,4 +13,4 @@ export function getDb(): PrismaClient {
   return cached;
 }
 
-export type { Prisma } from '.prisma/client';
+export type { Prisma } from '@prisma/client';
