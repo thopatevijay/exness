@@ -1,0 +1,29 @@
+{
+  "name": "@exness/batch-uploader",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "SERVICE_NAME=batch-uploader tsx watch src/index.ts",
+    "start": "SERVICE_NAME=batch-uploader node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0"
+  },
+  "dependencies": {
+    "@exness/bus": "workspace:*",
+    "@exness/config": "workspace:*",
+    "@exness/db": "workspace:*",
+    "@exness/logger": "workspace:*",
+    "@exness/shared": "workspace:*",
+    "ioredis": "5.10.1"
+  },
+  "devDependencies": {
+    "@exness/eslint-config": "workspace:*",
+    "@exness/typescript-config": "workspace:*",
+    "@types/node": "24.11.1",
+    "eslint": "10.2.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3"
+  }
+}

@@ -21,6 +21,46 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  apps/batch-uploader:
+    dependencies:
+      '@exness/bus':
+        specifier: workspace:*
+        version: link:../../packages/bus
+      '@exness/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@exness/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@exness/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@exness/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      ioredis:
+        specifier: 5.10.1
+        version: 5.10.1
+    devDependencies:
+      '@exness/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@exness/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: 24.11.1
+        version: 24.11.1
+      eslint:
+        specifier: 10.2.1
+        version: 10.2.1(jiti@2.6.1)
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   apps/price-poller:
     dependencies:
       '@exness/bus':
