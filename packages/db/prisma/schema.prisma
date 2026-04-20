@@ -1,0 +1,85 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  output          = "../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, timescaledb, uuidOssp(map: "uuid-ossp")]
+}
+
+model User {
+  id           String         @id @default(uuid()) @db.Uuid
+  email        String         @unique @db.Citext
+  passwordHash String         @map("password_hash")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  balance      Balance?
+  orders       Order[]
+  history      TradeHistory[]
+
+  @@map("users")
+}
+
+model Asset {
+  symbol        String         @id
+  name          String
+  binanceSymbol String         @map("binance_symbol")
+  decimals      Int            @db.SmallInt
+  imageUrl      String         @map("image_url")
+  isActive      Boolean        @default(true) @map("is_active")
+  orders        Order[]
+  history       TradeHistory[]
+
+  @@map("assets")
+}
+
+model Balance {
+  userId     String   @id @map("user_id") @db.Uuid
+  usdBalance BigInt   @map("usd_balance")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("balances")
+}
+
+model Order {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  asset            String
+  side             String
+  margin           BigInt
+  leverage         Int      @db.SmallInt
+  openPrice        BigInt   @map("open_price")
+  stopLoss         BigInt?  @map("stop_loss")
+  takeProfit       BigInt?  @map("take_profit")
+  liquidationPrice BigInt   @map("liquidation_price")
+  openedAt         DateTime @default(now()) @map("opened_at") @db.Timestamptz
+  user             User     @relation(fields: [userId], references: [id])
+  assetRef         Asset    @relation(fields: [asset], references: [symbol])
+
+  @@index([userId], map: "orders_user_idx")
+  @@index([asset], map: "orders_asset_idx")
+  @@map("orders")
+}
+
+model TradeHistory {
+  id          String   @id @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  asset       String
+  side        String
+  margin      BigInt
+  leverage    Int      @db.SmallInt
+  openPrice   BigInt   @map("open_price")
+  closePrice  BigInt   @map("close_price")
+  pnl         BigInt
+  closeReason String   @map("close_reason")
+  openedAt    DateTime @map("opened_at") @db.Timestamptz
+  closedAt    DateTime @default(now()) @map("closed_at") @db.Timestamptz
+  user        User     @relation(fields: [userId], references: [id])
+  assetRef    Asset    @relation(fields: [asset], references: [symbol])
+
+  @@index([userId, closedAt(sort: Desc)], map: "trade_history_user_idx")
+  @@map("trade_history")
+}

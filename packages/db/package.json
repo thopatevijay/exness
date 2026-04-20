@@ -1,0 +1,27 @@
+{
+  "name": "@exness/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "prisma:pull": "prisma db pull",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@exness/config": "workspace:*",
+    "@prisma/client": "6.19.3"
+  },
+  "devDependencies": {
+    "@exness/eslint-config": "workspace:*",
+    "@exness/typescript-config": "workspace:*",
+    "@types/node": "24.11.1",
+    "eslint": "10.2.1",
+    "prisma": "6.19.3",
+    "typescript": "6.0.3"
+  }
+}
