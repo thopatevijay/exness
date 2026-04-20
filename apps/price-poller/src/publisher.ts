@@ -1,0 +1,49 @@
+import type { Redis } from 'ioredis';
+import { applySpread, parseBinancePrice } from '@exness/money';
+import { ASSET_DECIMALS, type Symbol } from '@exness/shared';
+import type { RawBinanceTrade } from './binance.js';
+
+const STREAM_MAXLEN = 100_000;
+// Binance sends quantities at 8 decimals on the wire; keep that as the qty precision.
+const QTY_DECIMALS = 8;
+
+export async function publishTrade(redis: Redis, sym: Symbol, t: RawBinanceTrade): Promise<void> {
+  const assetDecimals = ASSET_DECIMALS[sym];
+  const mid = parseBinancePrice(t.p, assetDecimals);
+  const { buy, sell } = applySpread(mid);
+  const ts = t.T;
+
+  const priceUpdate = JSON.stringify({
+    symbol: sym,
+    buy: buy.value.toString(),
+    sell: sell.value.toString(),
+    decimals: assetDecimals,
+    ts,
+  });
+  const latestPayload = JSON.stringify({
+    buy: buy.value.toString(),
+    sell: sell.value.toString(),
+    decimals: assetDecimals,
+    ts,
+  });
+
+  const pipeline = redis.multi();
+  pipeline.publish(`prices:${sym}`, priceUpdate);
+  pipeline.xadd(
+    `trades:${sym}`,
+    'MAXLEN',
+    '~',
+    String(STREAM_MAXLEN),
+    '*',
+    'symbol',
+    sym,
+    'price',
+    mid.value.toString(),
+    'qty',
+    parseBinancePrice(t.q, QTY_DECIMALS).value.toString(),
+    'ts',
+    String(ts),
+  );
+  pipeline.set(`latest:${sym}`, latestPayload, 'EX', 60);
+  await pipeline.exec();
+}

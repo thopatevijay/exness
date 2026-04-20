@@ -1,0 +1,31 @@
+{
+  "name": "@exness/price-poller",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "SERVICE_NAME=price-poller tsx watch src/index.ts",
+    "start": "SERVICE_NAME=price-poller node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0"
+  },
+  "dependencies": {
+    "@exness/bus": "workspace:*",
+    "@exness/config": "workspace:*",
+    "@exness/logger": "workspace:*",
+    "@exness/money": "workspace:*",
+    "@exness/shared": "workspace:*",
+    "ioredis": "5.10.1",
+    "ws": "8.20.0"
+  },
+  "devDependencies": {
+    "@exness/eslint-config": "workspace:*",
+    "@exness/typescript-config": "workspace:*",
+    "@types/node": "24.11.1",
+    "@types/ws": "8.18.1",
+    "eslint": "10.2.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3"
+  }
+}
