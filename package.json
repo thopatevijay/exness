@@ -1,0 +1,22 @@
+{
+  "name": "exness",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\""
+  },
+  "devDependencies": {
+    "turbo": "2.9.6",
+    "prettier": "3.8.3",
+    "typescript": "6.0.3"
+  }
+}
