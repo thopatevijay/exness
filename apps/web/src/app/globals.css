@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import "../styles/theme.css";
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+}
+
+.font-mono { font-family: var(--font-mono); }
+
+.flash-up   { animation: flashUp   200ms ease-out; }
+.flash-down { animation: flashDown 200ms ease-out; }
+
+@keyframes flashUp   { from { background-color: rgba(34,197,94,0.4); }   to { background-color: transparent; } }
+@keyframes flashDown { from { background-color: rgba(239,68,68,0.4); }  to { background-color: transparent; } }
