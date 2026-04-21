@@ -15,7 +15,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\"",
     "db:bootstrap": "psql $DATABASE_URL -f scripts/bootstrap.sql -f scripts/seed-assets.sql",
     "db:reset": "psql $DATABASE_URL -f scripts/reset.sql",
-    "db:seed-assets": "psql $DATABASE_URL -f scripts/seed-assets.sql"
+    "db:seed-assets": "psql $DATABASE_URL -f scripts/seed-assets.sql",
+    "log:tail": "./scripts/tail-logs.sh"
   },
   "devDependencies": {
     "@types/node": "24.11.1",
