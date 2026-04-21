@@ -7,7 +7,12 @@ export const SignupSchema = z.object({
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
 
-export const SigninSchema = SignupSchema;
+// Signin accepts any non-empty password — min-length is a signup-time policy.
+// Enforcing it at signin would leak policy via 411 and block legacy users.
+export const SigninSchema = z.object({
+  email: z.email(),
+  password: z.string().min(1),
+});
 export type SigninInput = z.infer<typeof SigninSchema>;
 
 export const OpenTradeSchema = z.object({
