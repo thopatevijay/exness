@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import type { IncomingMessage } from 'node:http';
+import { refreshAggregatedMetrics } from './lib/aggregateMetrics.js';
 import { errorMiddleware } from './middleware/error.js';
 import { requestId } from './middleware/requestId.js';
 import { httpRequestDurationMs, registry } from './metrics.js';
@@ -48,6 +49,11 @@ export function buildServer(): express.Express {
   app.use('/api/v1', router);
 
   app.get('/metrics', async (_req, res) => {
+    try {
+      await refreshAggregatedMetrics();
+    } catch (err) {
+      logger.error({ err }, 'metrics aggregation failed');
+    }
     res.set('content-type', registry.contentType);
     res.send(await registry.metrics());
   });

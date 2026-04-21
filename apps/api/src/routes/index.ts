@@ -4,6 +4,7 @@ import { signin } from '../auth/signin.js';
 import { signup } from '../auth/signup.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { getPlatformSummary } from './admin.js';
 import { getAssets } from './assets.js';
 import { getBalance } from './balance.js';
 import { getCandles } from './candles.js';
@@ -26,3 +27,6 @@ router.post('/trade/:id/close', requireAuth, closeTrade);
 router.get('/trades/open', requireAuth, getOpenTrades);
 router.get('/trades', requireAuth, getClosedTrades);
 router.get('/candles', requireAuth, getCandles);
+
+// Admin (unauthenticated for V0 demo; V1 will add isAdmin flag + middleware)
+router.get('/admin/platform', getPlatformSummary);
