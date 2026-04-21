@@ -1,13 +1,28 @@
 import { Router, type Router as ExpressRouter } from 'express';
-import { SigninSchema, SignupSchema } from '@exness/shared';
+import { OpenTradeSchema, SigninSchema, SignupSchema } from '@exness/shared';
 import { signin } from '../auth/signin.js';
 import { signup } from '../auth/signup.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { getAssets } from './assets.js';
 import { getBalance } from './balance.js';
+import { getCandles } from './candles.js';
+import { closeTrade } from './tradeClose.js';
+import { openTrade } from './trade.js';
+import { getClosedTrades } from './tradesClosed.js';
+import { getOpenTrades } from './tradesOpen.js';
 
 export const router: ExpressRouter = Router();
 
+// Public
 router.post('/user/signup', validateBody(SignupSchema), signup);
 router.post('/user/signin', validateBody(SigninSchema), signin);
+router.get('/assets', getAssets);
+
+// Protected
 router.get('/user/balance', requireAuth, getBalance);
+router.post('/trade', requireAuth, validateBody(OpenTradeSchema), openTrade);
+router.post('/trade/:id/close', requireAuth, closeTrade);
+router.get('/trades/open', requireAuth, getOpenTrades);
+router.get('/trades', requireAuth, getClosedTrades);
+router.get('/candles', requireAuth, getCandles);
