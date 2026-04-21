@@ -1,6 +1,7 @@
 import { createRedis } from '@exness/bus';
 import { logger } from '@exness/logger';
 import { startHealth } from './health.js';
+import { initMetrics } from './metrics.js';
 import { startOrderFanout } from './orderFanout.js';
 import { startPricesFanout } from './pricesFanout.js';
 import { startWsServer } from './server.js';
@@ -13,6 +14,7 @@ async function main(): Promise<void> {
   const reg = startWsServer();
   startPricesFanout(redisPubSub, reg);
   startHealth(redisStreams, reg);
+  initMetrics(redisStreams, reg);
 
   process.on('SIGINT', () => {
     void redisPubSub.quit();

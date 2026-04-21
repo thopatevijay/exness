@@ -3,6 +3,7 @@ import { logger } from '@exness/logger';
 import { SYMBOLS, type Symbol } from '@exness/shared';
 import type { Redis } from 'ioredis';
 import { insertTicks, type Tick } from './inserter.js';
+import { recordInserts } from './metrics.js';
 
 const GROUP = 'cg:uploader';
 // Stable consumer name so pending entries from a crash belong to the same consumer on restart.
@@ -25,6 +26,7 @@ export async function runConsumer(redis: Redis): Promise<void> {
     buffer = [];
     try {
       await insertTicks(toFlush.map((b) => b.tick));
+      recordInserts(toFlush.length);
       const grouped = new Map<string, string[]>();
       for (const b of toFlush) {
         if (!grouped.has(b.stream)) grouped.set(b.stream, []);

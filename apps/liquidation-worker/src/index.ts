@@ -4,6 +4,7 @@ import { SYMBOLS, type Symbol } from '@exness/shared';
 import { evaluateTick, type Tick } from './evaluator.js';
 import { startHealth } from './health.js';
 import { OrderIndex } from './index_.js';
+import { initMetrics } from './metrics.js';
 import { rebuildIndex, startReconciler } from './reconciler.js';
 
 type OrderAddPayload = {
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
 
   // 1. Bootstrap index from DB
   await rebuildIndex(index);
+  initMetrics(redisData, index);
 
   // 2. Subscribe to orders:events for live deltas
   await redisPubSub.subscribe('orders:events');

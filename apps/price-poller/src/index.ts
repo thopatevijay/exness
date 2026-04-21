@@ -1,6 +1,7 @@
 import { logger } from '@exness/logger';
 import { createRedis } from '@exness/bus';
 import { connectBinance } from './binance.js';
+import { initMetrics, recordTick } from './metrics.js';
 import { publishTrade } from './publisher.js';
 import { startHealth } from './health.js';
 
@@ -9,10 +10,12 @@ async function main(): Promise<void> {
   const lastTickRef = { ts: Date.now() };
 
   startHealth(redis, lastTickRef);
+  initMetrics(redis);
 
   const conn = connectBinance({
     onTrade: (sym, trade) => {
       lastTickRef.ts = Date.now();
+      recordTick(sym, trade.T);
       publishTrade(redis, sym, trade).catch((err) =>
         logger.error({ err, sym }, 'publishTrade failed'),
       );
