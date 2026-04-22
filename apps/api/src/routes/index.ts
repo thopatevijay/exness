@@ -12,6 +12,9 @@ import { closeTrade } from './tradeClose.js';
 import { openTrade } from './trade.js';
 import { getClosedTrades } from './tradesClosed.js';
 import { getOpenTrades } from './tradesOpen.js';
+import { deposit } from './userDeposit.js';
+import { getMe } from './userMe.js';
+import { resetDemo } from './userReset.js';
 
 export const router: ExpressRouter = Router();
 
@@ -21,7 +24,10 @@ router.post('/user/signin', validateBody(SigninSchema), signin);
 router.get('/assets', getAssets);
 
 // Protected
+router.get('/user/me', requireAuth, getMe);
 router.get('/user/balance', requireAuth, getBalance);
+router.post('/user/deposit', requireAuth, deposit);
+router.post('/user/reset-demo', requireAuth, resetDemo);
 router.post('/trade', requireAuth, validateBody(OpenTradeSchema), openTrade);
 router.post('/trade/:id/close', requireAuth, closeTrade);
 router.get('/trades/open', requireAuth, getOpenTrades);

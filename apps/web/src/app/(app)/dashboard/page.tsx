@@ -2,19 +2,18 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { AssetSidebar } from '@/components/AssetSidebar';
 import { BalanceBar } from '@/components/BalanceBar';
 import { ChartPanel, type ChartOverlay } from '@/components/ChartPanel';
 import { OrderPanel } from '@/components/OrderPanel';
 import { PositionsTabs } from '@/components/PositionsTabs';
+import { SettingsPopover } from '@/components/SettingsPopover';
 import { StatusStrip } from '@/components/StatusStrip';
 import type { TF } from '@/components/TimeframePicker';
 import type { AssetView } from '@/hooks/useAssets';
 import { useOpenOrders } from '@/hooks/useOpenOrders';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [asset, setAsset] = useState<AssetView['symbol']>('BTC');
   const [tf, setTf] = useState<TF>('1m');
   const { data: openOrders } = useOpenOrders();
@@ -44,11 +43,6 @@ export default function DashboardPage() {
     return out;
   }, [openOrders, asset]);
 
-  async function logout(): Promise<void> {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-  }
-
   return (
     <div className="grid h-screen grid-rows-[auto_1fr]">
       <header className="flex items-center justify-between border-b border-[color:var(--color-border)] px-6 py-3">
@@ -61,9 +55,7 @@ export default function DashboardPage() {
           >
             Ops
           </Link>
-          <button onClick={logout} className="text-sm text-[color:var(--color-fg-dim)] underline">
-            Log out
-          </button>
+          <SettingsPopover />
         </div>
       </header>
       <div className="grid grid-cols-[280px_1fr_320px] overflow-hidden">
