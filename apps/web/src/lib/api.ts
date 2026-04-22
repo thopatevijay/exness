@@ -1,4 +1,5 @@
-import { API_URL } from './env';
+// Client-side fetch wrapper. Always same-origin — backend calls go through
+// Next.js route handlers that proxy with the JWT from the httpOnly cookie.
 
 export class ApiResponseError extends Error {
   public readonly status: number;
@@ -11,9 +12,7 @@ export class ApiResponseError extends Error {
             body &&
             'error' in body &&
             typeof (body as { error: unknown }).error === 'object'
-          ? String(
-              ((body as { error: { message?: unknown } }).error.message ?? 'API error'),
-            )
+          ? String(((body as { error: { message?: unknown } }).error.message ?? 'API error'))
           : 'API error';
     super(msg);
     this.status = status;
@@ -26,11 +25,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     'content-type': 'application/json',
     ...((init.headers as Record<string, string>) ?? {}),
   };
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers,
-  });
+  const res = await fetch(path, { ...init, headers });
   const text = await res.text();
   const body = text ? (JSON.parse(text) as unknown) : null;
   if (!res.ok) throw new ApiResponseError(res.status, body);
