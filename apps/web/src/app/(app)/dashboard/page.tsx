@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AssetSidebar } from '@/components/AssetSidebar';
 import { BalanceBar } from '@/components/BalanceBar';
 import { ChartPanel, type ChartOverlay } from '@/components/ChartPanel';
 import { OrderPanel } from '@/components/OrderPanel';
 import { PositionsTabs } from '@/components/PositionsTabs';
+import { StatusStrip } from '@/components/StatusStrip';
 import type { TF } from '@/components/TimeframePicker';
 import type { AssetView } from '@/hooks/useAssets';
 import { useOpenOrders } from '@/hooks/useOpenOrders';
@@ -51,9 +53,18 @@ export default function DashboardPage() {
     <div className="grid h-screen grid-rows-[auto_1fr]">
       <header className="flex items-center justify-between border-b border-[color:var(--color-border)] px-6 py-3">
         <span className="text-base font-semibold">Exness</span>
-        <button onClick={logout} className="text-sm text-[color:var(--color-fg-dim)] underline">
-          Log out
-        </button>
+        <div className="flex items-center gap-6">
+          <StatusStrip />
+          <Link
+            href="/dashboard/ops"
+            className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
+          >
+            Ops
+          </Link>
+          <button onClick={logout} className="text-sm text-[color:var(--color-fg-dim)] underline">
+            Log out
+          </button>
+        </div>
       </header>
       <div className="grid grid-cols-[280px_1fr_320px] overflow-hidden">
         <AssetSidebar selected={asset} onSelect={setAsset} />

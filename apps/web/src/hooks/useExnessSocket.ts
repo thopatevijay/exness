@@ -31,10 +31,13 @@ type WsMessage =
 export function useExnessSocket(): void {
   const qc = useQueryClient();
   const setPrice = usePricesStore((s) => s.setPrice);
+  const setWsLatency = usePricesStore((s) => s.setWsLatency);
+  const setWsConnected = usePricesStore((s) => s.setWsConnected);
   const reset = usePricesStore((s) => s.reset);
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(1_000);
   const closedRef = useRef(false);
+  const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     closedRef.current = false;
@@ -57,12 +60,19 @@ export function useExnessSocket(): void {
 
       ws.addEventListener('open', () => {
         backoffRef.current = 1_000;
+        setWsConnected(Date.now());
         ws.send(JSON.stringify({ type: 'subscribe', assets: SYMBOLS }));
         // Gap-fill: after a reconnect, refetch all stateful queries in case we
         // missed an order_update while the socket was down.
         qc.invalidateQueries({ queryKey: ['balance'] });
         qc.invalidateQueries({ queryKey: ['open-orders'] });
         qc.invalidateQueries({ queryKey: ['closed-orders'] });
+        if (pingRef.current) clearInterval(pingRef.current);
+        pingRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+          }
+        }, 5_000);
       });
 
       ws.addEventListener('message', (ev) => {
@@ -96,6 +106,8 @@ export function useExnessSocket(): void {
                 toast.success(`Take profit hit — pnl ${sign}$${fmt}`);
               }
             }
+          } else if (msg.type === 'pong') {
+            setWsLatency(Date.now() - msg.ts);
           } else if (msg.type === 'error') {
             toast.error(msg.message);
           }
@@ -106,6 +118,10 @@ export function useExnessSocket(): void {
 
       ws.addEventListener('close', () => {
         wsRef.current = null;
+        if (pingRef.current) {
+          clearInterval(pingRef.current);
+          pingRef.current = null;
+        }
         if (closedRef.current) return;
         const delay = backoffRef.current;
         backoffRef.current = Math.min(backoffRef.current * 2, 30_000);
@@ -122,8 +138,12 @@ export function useExnessSocket(): void {
 
     return () => {
       closedRef.current = true;
+      if (pingRef.current) {
+        clearInterval(pingRef.current);
+        pingRef.current = null;
+      }
       wsRef.current?.close();
       reset();
     };
-  }, [qc, setPrice, reset]);
+  }, [qc, setPrice, setWsLatency, setWsConnected, reset]);
 }

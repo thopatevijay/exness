@@ -15,3 +15,10 @@ html, body {
 
 @keyframes flashUp   { from { background-color: rgba(34,197,94,0.4); }   to { background-color: transparent; } }
 @keyframes flashDown { from { background-color: rgba(239,68,68,0.4); }  to { background-color: transparent; } }
+
+/* Heartbeat: full-height bars, brightness sweeps left→right (no height change) */
+.hb-bar { animation: hbPulse 2200ms ease-in-out infinite; }
+@keyframes hbPulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1.00; }
+}
