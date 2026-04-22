@@ -4,7 +4,7 @@ import { ASSET_DECIMALS, type CloseReason, type Symbol } from '@exness/shared';
 import type { Request, Response } from 'express';
 import { redis } from '../lib/redis.js';
 import { emitOrderClosed, publishOrderRemove } from '../lib/events.js';
-import { getLatestPrice } from '../lib/latestPrice.js';
+import { getLatestPrice, requireFresh } from '../lib/latestPrice.js';
 import { ApiError } from '../middleware/error.js';
 import { tradesClosedTotal } from '../metrics.js';
 
@@ -32,6 +32,9 @@ export async function closeTrade(req: Request, res: Response): Promise<void> {
   const decimals = ASSET_DECIMALS[asset];
 
   const latest = await getLatestPrice(redis(), asset);
+  // Close must also settle against a fresh price — stale fallback would
+  // distort the realized PnL that goes into the DB and the user's history.
+  requireFresh(latest, 10_000);
   const exitPrice = {
     value: side === 'buy' ? latest.sell : latest.buy,
     decimals,

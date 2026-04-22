@@ -32,7 +32,9 @@ export function connectBinance(opts: ConnectOptions): { close: () => void } {
   const url = `${env.BINANCE_WS_URL}?streams=${streams}`;
 
   let ws: WebSocket | null = null;
-  let backoffMs = 1_000;
+  // Initial backoff 100ms — Binance WS drops are typically brief (transient
+  // network or their rolling reconnect). Fast recovery minimizes UI blank time.
+  let backoffMs = 100;
   let closed = false;
 
   const open = (): void => {
@@ -41,7 +43,7 @@ export function connectBinance(opts: ConnectOptions): { close: () => void } {
 
     ws.on('open', () => {
       logger.info('binance ws open');
-      backoffMs = 1_000;
+      backoffMs = 100;
     });
 
     ws.on('message', (raw: WebSocket.RawData) => {

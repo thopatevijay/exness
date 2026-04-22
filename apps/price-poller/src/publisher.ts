@@ -44,6 +44,13 @@ export async function publishTrade(redis: Redis, sym: Symbol, t: RawBinanceTrade
     'ts',
     String(ts),
   );
-  pipeline.set(`latest:${sym}`, latestPayload, 'EX', 60);
+  // Two price keys:
+  //   `latest:*` — 5-min TTL, signals liveness. Fresh if < 5 s old.
+  //   `last:*`   — no TTL, persistent last-known value. Used as fallback
+  //                when `latest:*` expires during a longer outage so the UI
+  //                shows *something* (with a stale indicator) instead of
+  //                blanking out every panel.
+  pipeline.set(`latest:${sym}`, latestPayload, 'EX', 300);
+  pipeline.set(`last:${sym}`, latestPayload);
   await pipeline.exec();
 }

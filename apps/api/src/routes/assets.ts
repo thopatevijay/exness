@@ -11,10 +11,12 @@ export async function getAssets(_req: Request, res: Response): Promise<void> {
     rows.map(async (a) => {
       let buyPrice: number | null = null;
       let sellPrice: number | null = null;
+      let ts: number | null = null;
       try {
         const latest = await getLatestPrice(redis(), a.symbol as Symbol);
         buyPrice = toApi({ value: latest.buy, decimals: a.decimals }, a.decimals).value;
         sellPrice = toApi({ value: latest.sell, decimals: a.decimals }, a.decimals).value;
+        ts = latest.ts;
       } catch {
         // price unavailable; emit nulls for this asset
       }
@@ -23,6 +25,7 @@ export async function getAssets(_req: Request, res: Response): Promise<void> {
         symbol: a.symbol,
         buyPrice,
         sellPrice,
+        ts,
         decimals: a.decimals,
         imageUrl: a.imageUrl,
       };

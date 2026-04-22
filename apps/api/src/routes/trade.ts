@@ -4,7 +4,7 @@ import { ASSET_DECIMALS, type OpenTradeInput } from '@exness/shared';
 import type { Request, Response } from 'express';
 import { redis } from '../lib/redis.js';
 import { emitOrderOpened, publishOrderAdd } from '../lib/events.js';
-import { getLatestPrice } from '../lib/latestPrice.js';
+import { getLatestPrice, requireFresh } from '../lib/latestPrice.js';
 import { ApiError } from '../middleware/error.js';
 import { tradesOpenedTotal } from '../metrics.js';
 
@@ -13,8 +13,10 @@ export async function openTrade(req: Request, res: Response): Promise<void> {
   const input = req.body as OpenTradeInput;
   const decimals = ASSET_DECIMALS[input.asset];
 
-  // 1. Latest price (already at asset's decimals)
+  // 1. Latest price (already at asset's decimals). Must be fresh — we never
+  // open against a stale fallback price.
   const latest = await getLatestPrice(redis(), input.asset);
+  requireFresh(latest, 10_000);
   const openSidePriceBigint = input.type === 'buy' ? latest.buy : latest.sell;
   const openSidePrice = { value: openSidePriceBigint, decimals };
 

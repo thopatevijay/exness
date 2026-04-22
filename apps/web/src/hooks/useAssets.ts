@@ -8,6 +8,7 @@ export type AssetView = {
   symbol: 'BTC' | 'ETH' | 'SOL';
   buyPrice: number | null;
   sellPrice: number | null;
+  ts: number | null; // ms timestamp of last tick; null when no price history exists
   decimals: number;
   imageUrl: string;
 };

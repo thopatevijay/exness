@@ -4,9 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { fmtPrice } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-type Props = { value: number | null; decimals: number; className?: string };
+type Props = {
+  value: number | null;
+  decimals: number;
+  className?: string;
+  stale?: boolean;
+};
 
-export function PriceCell({ value, decimals, className }: Props) {
+export function PriceCell({ value, decimals, className, stale = false }: Props) {
   const prev = useRef<number | null>(null);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
 
@@ -23,10 +28,12 @@ export function PriceCell({ value, decimals, className }: Props) {
 
   return (
     <span
+      title={stale ? 'Price feed stale — last-known value shown' : undefined}
       className={cn(
         'font-mono tabular-nums',
         flash === 'up' && 'flash-up',
         flash === 'down' && 'flash-down',
+        stale && 'opacity-50',
         className,
       )}
     >
