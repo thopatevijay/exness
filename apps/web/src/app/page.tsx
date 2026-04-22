@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import { SocketMount } from '@/components/SocketMount';
+import { TickerStrip } from '@/components/TickerStrip';
 
 export default function Landing() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-20">
+      <SocketMount />
       <h1 className="text-4xl font-semibold tracking-tight">Exness Clone</h1>
       <p className="mt-4 text-lg text-[color:var(--color-fg-dim)]">
         Live Binance prices, leveraged margin trading, automatic liquidation. Open a position,
@@ -22,6 +25,7 @@ export default function Landing() {
           Sign up
         </Link>
       </div>
+      <TickerStrip />
     </main>
   );
 }

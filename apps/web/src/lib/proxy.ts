@@ -47,6 +47,9 @@ export async function proxy(
     }
   }
 
+  const incomingReqId = req.headers.get('x-request-id');
+  if (incomingReqId) headers['x-request-id'] = incomingReqId;
+
   const upstream = await fetch(target, init);
   const payload = await upstream.json().catch(() => ({}));
   return NextResponse.json(payload, { status: upstream.status });

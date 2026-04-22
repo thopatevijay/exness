@@ -11,6 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
 import { useCandles, type Candle } from '@/hooks/useCandles';
+import { usePrice } from '@/store/prices';
 import { TimeframePicker, type TF } from './TimeframePicker';
 
 export type ChartOverlay = {
@@ -32,6 +33,7 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const { data } = useCandles(asset, tf);
+  const live = usePrice(asset);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -95,6 +97,25 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
       }),
     );
   }, [overlays]);
+
+  // Live-tick the last candle on every price frame from the WS store
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series || !live || !data?.candles.length) return;
+    const last = data.candles[data.candles.length - 1];
+    if (!last) return;
+    const dec = last.decimal;
+    const liveMid = (live.buy + live.sell) / 2 / 10 ** dec;
+    const currentHigh = last.high / 10 ** dec;
+    const currentLow = last.low / 10 ** dec;
+    series.update({
+      time: last.timestamp as UTCTimestamp,
+      open: last.open / 10 ** dec,
+      high: Math.max(currentHigh, liveMid),
+      low: Math.min(currentLow, liveMid),
+      close: liveMid,
+    });
+  }, [live, data]);
 
   return (
     <div className="flex h-full flex-col">

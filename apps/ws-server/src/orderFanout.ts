@@ -27,6 +27,7 @@ export async function startOrderFanout(redis: Redis, reg: SubscriptionRegistry):
         closeReason: e.data['closeReason'] ?? null,
         // eslint-disable-next-line no-restricted-syntax -- api boundary: stream string to JSON number
         pnl: e.data['pnl'] ? Number(e.data['pnl']) : null,
+        requestId: e.data['requestId'] ?? null,
       });
 
       const sockets = reg.socketsForUser(userId);

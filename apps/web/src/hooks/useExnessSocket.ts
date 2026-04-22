@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { SYMBOLS, type Symbol } from '@exness/shared';
 import { WS_URL } from '@/lib/env';
+import { wasLocal } from '@/lib/requestIdMemory';
 import { usePricesStore } from '@/store/prices';
 
 type WsMessage =
@@ -23,6 +24,7 @@ type WsMessage =
       orderId: string;
       closeReason: string | null;
       pnl: number | null;
+      requestId: string | null;
     }
   | { type: 'welcome'; userId: string; serverTime: number }
   | { type: 'pong'; ts: number }
@@ -93,6 +95,10 @@ export function useExnessSocket(): void {
             qc.invalidateQueries({ queryKey: ['open-orders'] });
             qc.invalidateQueries({ queryKey: ['closed-orders'] });
             qc.invalidateQueries({ queryKey: ['balance'] });
+            const localEcho = wasLocal(msg.requestId);
+            if (msg.event === 'opened' && !localEcho) {
+              toast.success('Order opened (from another session)');
+            }
             if (msg.event === 'closed') {
               const reason = msg.closeReason ?? '';
               const pnl = msg.pnl ?? 0;
@@ -104,6 +110,8 @@ export function useExnessSocket(): void {
                 toast.warning(`Stop loss hit — pnl ${sign}$${fmt}`);
               } else if (reason === 'tp') {
                 toast.success(`Take profit hit — pnl ${sign}$${fmt}`);
+              } else if (reason === 'manual' && !localEcho) {
+                toast.info(`Order closed (from another session) — pnl ${sign}$${fmt}`);
               }
             }
           } else if (msg.type === 'pong') {
