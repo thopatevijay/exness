@@ -5,6 +5,7 @@ import {
   ColorType,
   createChart,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -12,17 +13,25 @@ import { useEffect, useRef } from 'react';
 import { useCandles, type Candle } from '@/hooks/useCandles';
 import { TimeframePicker, type TF } from './TimeframePicker';
 
+export type ChartOverlay = {
+  price: number;
+  color: string;
+  label: string;
+};
+
 type Props = {
   asset: 'BTC' | 'ETH' | 'SOL';
   tf: TF;
   onTfChange: (tf: TF) => void;
+  overlays?: ChartOverlay[];
 };
 
-export function ChartPanel({ asset, tf, onTfChange }: Props) {
+export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const { data, isLoading } = useCandles(asset, tf);
+  const linesRef = useRef<IPriceLine[]>([]);
+  const { data } = useCandles(asset, tf);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -52,6 +61,7 @@ export function ChartPanel({ asset, tf, onTfChange }: Props) {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      linesRef.current = [];
     };
   }, []);
 
@@ -69,6 +79,23 @@ export function ChartPanel({ asset, tf, onTfChange }: Props) {
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 
+  // Sync overlays to price lines
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    for (const line of linesRef.current) series.removePriceLine(line);
+    linesRef.current = overlays.map((o) =>
+      series.createPriceLine({
+        price: o.price,
+        color: o.color,
+        lineWidth: 1,
+        lineStyle: 2, // dashed
+        title: o.label,
+        axisLabelVisible: true,
+      }),
+    );
+  }, [overlays]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-4 py-2">
@@ -78,11 +105,6 @@ export function ChartPanel({ asset, tf, onTfChange }: Props) {
         <TimeframePicker value={tf} onChange={onTfChange} />
       </div>
       <div className="relative flex-1">
-        {isLoading && (
-          <div className="absolute inset-0 grid place-items-center text-sm text-[color:var(--color-fg-dim)]">
-            Loading candles…
-          </div>
-        )}
         <div ref={containerRef} className="h-full w-full" />
       </div>
     </div>
