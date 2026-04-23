@@ -96,6 +96,7 @@ function entryToTick(entry: StreamEntry): Tick | null {
   const symRaw = entry.data['symbol'];
   const priceRaw = entry.data['price'];
   const tsRaw = entry.data['ts'];
+  const qtyRaw = entry.data['qty'];
   if (!symRaw || !priceRaw || !tsRaw) return null;
   if (!SYMBOLS.includes(symRaw as Symbol)) return null;
   return {
@@ -103,5 +104,6 @@ function entryToTick(entry: StreamEntry): Tick | null {
     time: new Date(Number(tsRaw)),
     asset: symRaw as Symbol,
     price: BigInt(priceRaw),
+    qty: qtyRaw ? BigInt(qtyRaw) : 0n,
   };
 }

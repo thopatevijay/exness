@@ -21,9 +21,16 @@ export async function getCandles(req: Request, res: Response): Promise<void> {
   const end = new Date(q.endTime);
 
   const rows = await getDb().$queryRawUnsafe<
-    { bucket: Date; open: bigint; high: bigint; low: bigint; close: bigint }[]
+    {
+      bucket: Date;
+      open: bigint;
+      high: bigint;
+      low: bigint;
+      close: bigint;
+      volume: bigint | null;
+    }[]
   >(
-    `SELECT bucket, open, high, low, close
+    `SELECT bucket, open, high, low, close, volume
        FROM ${view}
       WHERE asset = $1
         AND bucket BETWEEN $2 AND $3
@@ -40,6 +47,8 @@ export async function getCandles(req: Request, res: Response): Promise<void> {
     high: toApi({ value: r.high, decimals: dec }, dec).value,
     low: toApi({ value: r.low, decimals: dec }, dec).value,
     close: toApi({ value: r.close, decimals: dec }, dec).value,
+    // eslint-disable-next-line no-restricted-syntax -- api boundary: qty bigint at 8dp → JSON number
+    volume: r.volume !== null ? Number(r.volume) : 0,
     decimal: dec,
   }));
 

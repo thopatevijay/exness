@@ -5,11 +5,12 @@ export type Tick = {
   time: Date;
   asset: Symbol;
   price: bigint;
+  qty: bigint;
 };
 
-// Postgres bind-variable cap is 32767 per prepared statement. With 3 params/row
-// we cap chunks at ~10k rows to stay well under that on large backlogs.
-const CHUNK = 10_000;
+// Postgres bind-variable cap is 32767 per prepared statement. With 4 params/row
+// we cap chunks at ~8k rows to stay well under that on large backlogs.
+const CHUNK = 8_000;
 
 export async function insertTicks(rows: Tick[]): Promise<void> {
   if (rows.length === 0) return;
@@ -23,12 +24,14 @@ async function insertChunk(rows: Tick[]): Promise<void> {
   const placeholders: string[] = [];
   const params: unknown[] = [];
   rows.forEach((r, i) => {
-    const base = i * 3;
-    placeholders.push(`($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint)`);
-    params.push(r.time, r.asset, r.price);
+    const base = i * 4;
+    placeholders.push(
+      `($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint, $${base + 4}::bigint)`,
+    );
+    params.push(r.time, r.asset, r.price, r.qty);
   });
   const sql = `
-    INSERT INTO ticks (time, asset, price)
+    INSERT INTO ticks (time, asset, price, qty)
     VALUES ${placeholders.join(',')}
     ON CONFLICT (time, asset) DO NOTHING
   `;

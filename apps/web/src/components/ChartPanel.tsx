@@ -3,6 +3,7 @@
 import {
   CandlestickSeries,
   ColorType,
+  HistogramSeries,
   createChart,
   type IChartApi,
   type IPriceLine,
@@ -31,6 +32,7 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const { data } = useCandles(asset, tf);
   const live = usePrice(asset);
@@ -73,12 +75,23 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
       wickUpColor: '#22c55e',
       wickDownColor: '#ef4444',
     });
+    const volume = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
     chartRef.current = chart;
     seriesRef.current = series;
+    volumeRef.current = volume;
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      volumeRef.current = null;
       linesRef.current = [];
     };
   }, []);
@@ -94,6 +107,13 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
       close: c.close / 10 ** c.decimal,
     }));
     seriesRef.current.setData(points);
+    volumeRef.current?.setData(
+      candles.map((c) => ({
+        time: c.timestamp as UTCTimestamp,
+        value: c.volume / 1e8, // qty stored at 8 decimals
+        color: c.close >= c.open ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)',
+      })),
+    );
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 

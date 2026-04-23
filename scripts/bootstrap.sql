@@ -81,7 +81,8 @@ CREATE INDEX IF NOT EXISTS trade_history_user_idx ON trade_history (user_id, clo
 CREATE TABLE IF NOT EXISTS ticks (
   time   timestamptz NOT NULL,
   asset  text NOT NULL,
-  price  bigint NOT NULL CHECK (price > 0)
+  price  bigint NOT NULL CHECK (price > 0),
+  qty    bigint NOT NULL DEFAULT 0     -- trade quantity at 8 decimals (base asset units)
 );
 SELECT create_hypertable('ticks', 'time', chunk_time_interval => INTERVAL '1 day', if_not_exists => TRUE);
 CREATE INDEX IF NOT EXISTS ticks_asset_time_idx ON ticks (asset, time DESC);
@@ -105,6 +106,7 @@ SELECT
   MAX(price)         AS high,
   MIN(price)         AS low,
   LAST(price, time)  AS close,
+  SUM(qty)           AS volume,
   COUNT(*)           AS trade_count
 FROM ticks
 GROUP BY bucket, asset;
@@ -124,6 +126,7 @@ SELECT
   MAX(price)         AS high,
   MIN(price)         AS low,
   LAST(price, time)  AS close,
+  SUM(qty)           AS volume,
   COUNT(*)           AS trade_count
 FROM ticks
 GROUP BY bucket, asset;
@@ -141,6 +144,7 @@ SELECT
   MAX(price)         AS high,
   MIN(price)         AS low,
   LAST(price, time)  AS close,
+  SUM(qty)           AS volume,
   COUNT(*)           AS trade_count
 FROM ticks
 GROUP BY bucket, asset;
@@ -158,6 +162,7 @@ SELECT
   MAX(price)         AS high,
   MIN(price)         AS low,
   LAST(price, time)  AS close,
+  SUM(qty)           AS volume,
   COUNT(*)           AS trade_count
 FROM ticks
 GROUP BY bucket, asset;
@@ -175,6 +180,7 @@ SELECT
   MAX(price)         AS high,
   MIN(price)         AS low,
   LAST(price, time)  AS close,
+  SUM(qty)           AS volume,
   COUNT(*)           AS trade_count
 FROM ticks
 GROUP BY bucket, asset;
@@ -192,6 +198,7 @@ SELECT
   MAX(price)         AS high,
   MIN(price)         AS low,
   LAST(price, time)  AS close,
+  SUM(qty)           AS volume,
   COUNT(*)           AS trade_count
 FROM ticks
 GROUP BY bucket, asset;

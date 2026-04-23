@@ -65,18 +65,20 @@ async function latestTickTime(asset: Symbol): Promise<Date | null> {
   return rows[0]?.t ?? null;
 }
 
+const QTY_DECIMALS = 8;
+
 async function insertKlinesAsTicks(asset: Symbol, klines: RawKline[]): Promise<number> {
   if (klines.length === 0) return 0;
   const decimals = ASSET_DECIMALS[asset];
-  const scale = 10 ** decimals;
+  const priceScale = 10 ** decimals;
+  const qtyScale = 10 ** QTY_DECIMALS;
 
   // Each kline becomes 4 synthetic ticks (open, high, low, close) spaced
   // within the minute so the CAGG's FIRST/MAX/MIN/LAST produces a real OHLC
-  // candle body instead of a flat line. Without this, 1-tick-per-minute
-  // backfill yields open=high=low=close degenerate candles.
-  const placeholders: string[] = [];
-  const params: unknown[] = [];
-  let rowIdx = 0;
+  // candle body instead of a flat line. The kline's total volume is placed
+  // on the close tick so SUM(qty) per bucket = full kline volume.
+  type Row = { time: Date; priceStr: string; qtyStr: string };
+  const rows: Row[] = [];
   for (const k of klines) {
     const openTime = k[0];
     const closeTime = k[6];
@@ -88,6 +90,8 @@ async function insertKlinesAsTicks(asset: Symbol, klines: RawKline[]): Promise<n
     const lowNum = Number(k[3]);
     // eslint-disable-next-line no-restricted-syntax -- Binance wire format: string → number at a known decimal scale
     const closeNum = Number(k[4]);
+    // eslint-disable-next-line no-restricted-syntax -- Binance wire format: string → number at a known decimal scale
+    const volumeNum = Number(k[5]);
     if (
       !Number.isFinite(openNum) ||
       !Number.isFinite(highNum) ||
@@ -96,40 +100,46 @@ async function insertKlinesAsTicks(asset: Symbol, klines: RawKline[]): Promise<n
     ) {
       continue;
     }
-    const toInt = (n: number): string => BigInt(Math.round(n * scale)).toString();
-    const samples: [Date, string][] = [
-      [new Date(openTime), toInt(openNum)],
-      [new Date(openTime + 15_000), toInt(highNum)],
-      [new Date(openTime + 30_000), toInt(lowNum)],
-      [new Date(closeTime), toInt(closeNum)],
-    ];
-    for (const [t, priceStr] of samples) {
-      const base = rowIdx * 3;
-      placeholders.push(`($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint)`);
-      params.push(t, asset, priceStr);
-      rowIdx += 1;
-    }
+    const toPriceInt = (n: number): string => BigInt(Math.round(n * priceScale)).toString();
+    const volumeInt = Number.isFinite(volumeNum)
+      ? BigInt(Math.round(volumeNum * qtyScale)).toString()
+      : '0';
+    rows.push({ time: new Date(openTime), priceStr: toPriceInt(openNum), qtyStr: '0' });
+    rows.push({
+      time: new Date(openTime + 15_000),
+      priceStr: toPriceInt(highNum),
+      qtyStr: '0',
+    });
+    rows.push({
+      time: new Date(openTime + 30_000),
+      priceStr: toPriceInt(lowNum),
+      qtyStr: '0',
+    });
+    rows.push({ time: new Date(closeTime), priceStr: toPriceInt(closeNum), qtyStr: volumeInt });
   }
-  if (placeholders.length === 0) return 0;
+  if (rows.length === 0) return 0;
 
-  // Postgres bind-variable cap is 32767. Keep chunks well under that.
-  const CHUNK_ROWS = 2000;
+  // Postgres bind-variable cap is 32767. Keep chunks well under that (4 params/row).
+  const CHUNK_ROWS = 2_000;
   let inserted = 0;
-  for (let i = 0; i < placeholders.length; i += CHUNK_ROWS) {
-    const slicePh = placeholders.slice(i, i + CHUNK_ROWS);
-    const sliceParams = params.slice(i * 3, (i + CHUNK_ROWS) * 3);
-    // Rebuild placeholders with contiguous $1..$N per chunk
-    const rebuilt = slicePh.map((_, j) => {
-      const base = j * 3;
-      return `($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint)`;
+  for (let i = 0; i < rows.length; i += CHUNK_ROWS) {
+    const slice = rows.slice(i, i + CHUNK_ROWS);
+    const placeholders: string[] = [];
+    const params: unknown[] = [];
+    slice.forEach((r, j) => {
+      const base = j * 4;
+      placeholders.push(
+        `($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint, $${base + 4}::bigint)`,
+      );
+      params.push(r.time, asset, r.priceStr, r.qtyStr);
     });
     const sql = `
-      INSERT INTO ticks (time, asset, price)
-      VALUES ${rebuilt.join(',')}
+      INSERT INTO ticks (time, asset, price, qty)
+      VALUES ${placeholders.join(',')}
       ON CONFLICT (time, asset) DO NOTHING
     `;
-    await getDb().$executeRawUnsafe(sql, ...sliceParams);
-    inserted += rebuilt.length;
+    await getDb().$executeRawUnsafe(sql, ...params);
+    inserted += slice.length;
   }
   return inserted;
 }
