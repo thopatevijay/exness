@@ -3,6 +3,7 @@ import { ModifyTradeSchema, OpenTradeSchema, SigninSchema, SignupSchema } from '
 import { signin } from '../auth/signin.js';
 import { signup } from '../auth/signup.js';
 import { requireAuth } from '../middleware/auth.js';
+import { idempotency } from '../middleware/idempotency.js';
 import { validateBody } from '../middleware/validate.js';
 import { getPlatformSummary } from './admin.js';
 import { getAssets } from './assets.js';
@@ -29,7 +30,7 @@ router.get('/user/me', requireAuth, getMe);
 router.get('/user/balance', requireAuth, getBalance);
 router.post('/user/deposit', requireAuth, deposit);
 router.post('/user/reset-demo', requireAuth, resetDemo);
-router.post('/trade', requireAuth, validateBody(OpenTradeSchema), openTrade);
+router.post('/trade', requireAuth, idempotency, validateBody(OpenTradeSchema), openTrade);
 router.post('/trade/:id/modify', requireAuth, validateBody(ModifyTradeSchema), modifyTrade);
 router.post('/trade/:id/close', requireAuth, closeTrade);
 router.get('/trades/open', requireAuth, getOpenTrades);
