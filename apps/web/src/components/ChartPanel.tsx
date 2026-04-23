@@ -47,8 +47,24 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
         vertLines: { color: 'rgba(255,255,255,0.05)' },
         horzLines: { color: 'rgba(255,255,255,0.05)' },
       },
-      timeScale: { rightOffset: 6, borderColor: 'rgba(255,255,255,0.1)' },
+      timeScale: {
+        rightOffset: 6,
+        borderColor: 'rgba(255,255,255,0.1)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
       rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+      localization: {
+        timeFormatter: (ts: number) => {
+          const d = new Date(ts * 1000);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mi = String(d.getMinutes()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+        },
+      },
     });
     const series = chart.addSeries(CandlestickSeries, {
       upColor: '#22c55e',

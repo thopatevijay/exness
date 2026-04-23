@@ -1,0 +1,243 @@
+// Self-healing gap filler:
+//   - On startup: backfill the last 7 days from Binance REST /klines. This
+//     is idempotent (ON CONFLICT DO NOTHING) and fills any internal holes
+//     that formed while the stack was offline.
+//   - Every 60 s: if MAX(time) in ticks is older than 2 min, the live stream
+//     has been paused (laptop sleep, binance WS drop). Backfill from the
+//     last known tick up to "now - 1 min" and let the live stream reclaim
+//     the current bucket.
+//
+// All inserts use ON CONFLICT (time, asset) DO NOTHING, so overlap with the
+// live stream is safe. After inserts, refresh_continuous_aggregate is called
+// over the affected window so 1m/5m/15m/1h/1d/1w stay in sync.
+
+import { getDb } from '@exness/db';
+import { logger } from '@exness/logger';
+import { ASSET_DECIMALS, SYMBOLS, type Symbol } from '@exness/shared';
+
+const BINANCE_BY_SYMBOL: Record<Symbol, string> = {
+  BTC: 'BTCUSDT',
+  ETH: 'ETHUSDT',
+  SOL: 'SOLUSDT',
+};
+
+const STARTUP_BACKFILL_DAYS = 7;
+const GAP_THRESHOLD_MS = 2 * 60_000;
+const BINANCE_KLINE_PAGE = 1000;
+const MS_PER_MINUTE = 60_000;
+const MS_PER_DAY = 24 * 60 * 60_000;
+
+type RawKline = [
+  number, // openTime (ms)
+  string, // open
+  string, // high
+  string, // low
+  string, // close
+  string, // volume
+  number, // closeTime (ms)
+  ...unknown[],
+];
+
+async function fetchKlines(
+  binanceSymbol: string,
+  startMs: number,
+  endMs: number,
+): Promise<RawKline[]> {
+  const url =
+    `https://api.binance.com/api/v3/klines` +
+    `?symbol=${binanceSymbol}` +
+    `&interval=1m` +
+    `&startTime=${startMs}` +
+    `&endTime=${endMs}` +
+    `&limit=${BINANCE_KLINE_PAGE}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new Error(`binance klines ${res.status} ${res.statusText}`);
+  const body = (await res.json()) as RawKline[];
+  if (!Array.isArray(body)) throw new Error('binance klines: non-array response');
+  return body;
+}
+
+async function latestTickTime(asset: Symbol): Promise<Date | null> {
+  const rows = await getDb().$queryRawUnsafe<{ t: Date | null }[]>(
+    `SELECT MAX(time) AS t FROM ticks WHERE asset = $1`,
+    asset,
+  );
+  return rows[0]?.t ?? null;
+}
+
+async function insertKlinesAsTicks(asset: Symbol, klines: RawKline[]): Promise<number> {
+  if (klines.length === 0) return 0;
+  const decimals = ASSET_DECIMALS[asset];
+  const scale = 10 ** decimals;
+
+  // Each kline becomes 4 synthetic ticks (open, high, low, close) spaced
+  // within the minute so the CAGG's FIRST/MAX/MIN/LAST produces a real OHLC
+  // candle body instead of a flat line. Without this, 1-tick-per-minute
+  // backfill yields open=high=low=close degenerate candles.
+  const placeholders: string[] = [];
+  const params: unknown[] = [];
+  let rowIdx = 0;
+  for (const k of klines) {
+    const openTime = k[0];
+    const closeTime = k[6];
+    // eslint-disable-next-line no-restricted-syntax -- Binance wire format: string → number at a known decimal scale
+    const openNum = Number(k[1]);
+    // eslint-disable-next-line no-restricted-syntax -- Binance wire format: string → number at a known decimal scale
+    const highNum = Number(k[2]);
+    // eslint-disable-next-line no-restricted-syntax -- Binance wire format: string → number at a known decimal scale
+    const lowNum = Number(k[3]);
+    // eslint-disable-next-line no-restricted-syntax -- Binance wire format: string → number at a known decimal scale
+    const closeNum = Number(k[4]);
+    if (
+      !Number.isFinite(openNum) ||
+      !Number.isFinite(highNum) ||
+      !Number.isFinite(lowNum) ||
+      !Number.isFinite(closeNum)
+    ) {
+      continue;
+    }
+    const toInt = (n: number): string => BigInt(Math.round(n * scale)).toString();
+    const samples: [Date, string][] = [
+      [new Date(openTime), toInt(openNum)],
+      [new Date(openTime + 15_000), toInt(highNum)],
+      [new Date(openTime + 30_000), toInt(lowNum)],
+      [new Date(closeTime), toInt(closeNum)],
+    ];
+    for (const [t, priceStr] of samples) {
+      const base = rowIdx * 3;
+      placeholders.push(`($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint)`);
+      params.push(t, asset, priceStr);
+      rowIdx += 1;
+    }
+  }
+  if (placeholders.length === 0) return 0;
+
+  // Postgres bind-variable cap is 32767. Keep chunks well under that.
+  const CHUNK_ROWS = 2000;
+  let inserted = 0;
+  for (let i = 0; i < placeholders.length; i += CHUNK_ROWS) {
+    const slicePh = placeholders.slice(i, i + CHUNK_ROWS);
+    const sliceParams = params.slice(i * 3, (i + CHUNK_ROWS) * 3);
+    // Rebuild placeholders with contiguous $1..$N per chunk
+    const rebuilt = slicePh.map((_, j) => {
+      const base = j * 3;
+      return `($${base + 1}::timestamptz, $${base + 2}, $${base + 3}::bigint)`;
+    });
+    const sql = `
+      INSERT INTO ticks (time, asset, price)
+      VALUES ${rebuilt.join(',')}
+      ON CONFLICT (time, asset) DO NOTHING
+    `;
+    await getDb().$executeRawUnsafe(sql, ...sliceParams);
+    inserted += rebuilt.length;
+  }
+  return inserted;
+}
+
+async function refreshCaggs(fromMs: number, toMs: number): Promise<void> {
+  // Extend the refresh window to cover bucket alignment (weekly bucket spans 7d).
+  const from = new Date(fromMs - 7 * MS_PER_DAY);
+  const to = new Date(toMs + MS_PER_MINUTE);
+  const views = ['candles_1m', 'candles_5m', 'candles_15m', 'candles_1h', 'candles_1d', 'candles_1w'];
+  for (const v of views) {
+    try {
+      await getDb().$executeRawUnsafe(
+        `CALL refresh_continuous_aggregate($1::regclass, $2::timestamptz, $3::timestamptz)`,
+        v,
+        from,
+        to,
+      );
+    } catch (err) {
+      logger.warn({ err, v }, 'cagg refresh failed');
+    }
+  }
+}
+
+async function backfillWindow(asset: Symbol, fromMs: number, toMs: number): Promise<number> {
+  const binanceSymbol = BINANCE_BY_SYMBOL[asset];
+  let cursor = fromMs;
+  let total = 0;
+  while (cursor < toMs) {
+    const pageEnd = Math.min(cursor + BINANCE_KLINE_PAGE * MS_PER_MINUTE, toMs);
+    let klines: RawKline[];
+    try {
+      klines = await fetchKlines(binanceSymbol, cursor, pageEnd);
+    } catch (err) {
+      logger.error({ err, asset }, 'binance klines fetch failed, aborting this pass');
+      break;
+    }
+    if (klines.length === 0) break;
+    total += await insertKlinesAsTicks(asset, klines);
+    const lastCloseTime = klines[klines.length - 1]?.[6];
+    if (!lastCloseTime || lastCloseTime <= cursor) break;
+    cursor = lastCloseTime + 1;
+  }
+  return total;
+}
+
+let running = false;
+
+export async function runStartupBackfill(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    const now = Date.now();
+    const from = now - STARTUP_BACKFILL_DAYS * MS_PER_DAY;
+    const to = now - MS_PER_MINUTE;
+    let total = 0;
+    for (const asset of SYMBOLS) {
+      const n = await backfillWindow(asset, from, to);
+      if (n > 0) logger.info({ asset, inserted: n }, 'startup gap-fill: inserted ticks');
+      total += n;
+    }
+    if (total > 0) {
+      await refreshCaggs(from, to);
+      logger.info({ inserted: total, days: STARTUP_BACKFILL_DAYS }, 'startup gap-fill complete');
+    } else {
+      logger.info({ days: STARTUP_BACKFILL_DAYS }, 'startup gap-fill: nothing to insert');
+    }
+  } finally {
+    running = false;
+  }
+}
+
+async function runPeriodicCatchUp(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    const now = Date.now();
+    const ceiling = now - MS_PER_MINUTE;
+    let windowStart = ceiling;
+    let total = 0;
+    for (const asset of SYMBOLS) {
+      const latest = await latestTickTime(asset);
+      if (!latest) continue;
+      const gapMs = now - latest.getTime();
+      if (gapMs < GAP_THRESHOLD_MS) continue;
+      const from = latest.getTime() + 1;
+      if (from >= ceiling) continue;
+      const n = await backfillWindow(asset, from, ceiling);
+      if (n > 0) {
+        logger.info({ asset, inserted: n, gapMin: Math.round(gapMs / 60_000) }, 'catch-up gap-fill');
+        total += n;
+        if (from < windowStart) windowStart = from;
+      }
+    }
+    if (total > 0) {
+      await refreshCaggs(windowStart, now);
+    }
+  } finally {
+    running = false;
+  }
+}
+
+export function startGapFiller(): void {
+  void runStartupBackfill().catch((err) => {
+    logger.error({ err }, 'gap-fill startup pass failed');
+  });
+  setInterval(() => {
+    void runPeriodicCatchUp().catch((err) => {
+      logger.error({ err }, 'gap-fill periodic pass failed');
+    });
+  }, 60_000);
+}
