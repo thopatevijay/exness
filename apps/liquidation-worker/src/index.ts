@@ -39,8 +39,9 @@ async function main(): Promise<void> {
     try {
       const evt = JSON.parse(raw) as
         | { kind: 'add'; order: OrderAddPayload }
+        | { kind: 'modify'; order: OrderAddPayload }
         | { kind: 'remove'; orderId: string };
-      if (evt.kind === 'add') {
+      if (evt.kind === 'add' || evt.kind === 'modify') {
         const o = evt.order;
         index.add({
           orderId: o.orderId,

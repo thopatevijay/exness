@@ -20,10 +20,12 @@ type WsMessage =
     }
   | {
       type: 'order_update';
-      event: 'opened' | 'closed';
+      event: 'opened' | 'closed' | 'modified';
       orderId: string;
       closeReason: string | null;
       pnl: number | null;
+      stopLoss: number | null;
+      takeProfit: number | null;
       requestId: string | null;
     }
   | { type: 'welcome'; userId: string; serverTime: number }
@@ -98,6 +100,9 @@ export function useExnessSocket(): void {
             const localEcho = wasLocal(msg.requestId);
             if (msg.event === 'opened' && !localEcho) {
               toast.success('Order opened (from another session)');
+            }
+            if (msg.event === 'modified' && !localEcho) {
+              toast.info(`Position ${msg.orderId.slice(0, 8)} modified`);
             }
             if (msg.event === 'closed') {
               const reason = msg.closeReason ?? '';

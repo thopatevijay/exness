@@ -25,6 +25,16 @@ export const OpenTradeSchema = z.object({
 });
 export type OpenTradeInput = z.infer<typeof OpenTradeSchema>;
 
+export const ModifyTradeSchema = z
+  .object({
+    stopLoss: z.number().int().positive().nullable().optional(),
+    takeProfit: z.number().int().positive().nullable().optional(),
+  })
+  .refine((d) => d.stopLoss !== undefined || d.takeProfit !== undefined, {
+    message: 'at least one of stopLoss/takeProfit must be provided',
+  });
+export type ModifyTradeInput = z.infer<typeof ModifyTradeSchema>;
+
 export const CandlesQuerySchema = z.object({
   asset: z.enum(SYMBOLS),
   startTime: z.coerce.number().int().nonnegative(),

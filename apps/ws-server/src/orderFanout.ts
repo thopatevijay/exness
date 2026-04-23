@@ -20,13 +20,21 @@ export async function startOrderFanout(redis: Redis, reg: SubscriptionRegistry):
         continue;
       }
 
+      const event =
+        type === 'order_opened' ? 'opened' : type === 'order_modified' ? 'modified' : 'closed';
+      const slRaw = e.data['stopLoss'];
+      const tpRaw = e.data['takeProfit'];
       const frame = JSON.stringify({
         type: 'order_update',
-        event: type === 'order_opened' ? 'opened' : 'closed',
+        event,
         orderId: e.data['orderId'],
         closeReason: e.data['closeReason'] ?? null,
         // eslint-disable-next-line no-restricted-syntax -- api boundary: stream string to JSON number
         pnl: e.data['pnl'] ? Number(e.data['pnl']) : null,
+        // eslint-disable-next-line no-restricted-syntax -- api boundary: stream string to JSON number
+        stopLoss: slRaw ? Number(slRaw) : null,
+        // eslint-disable-next-line no-restricted-syntax -- api boundary: stream string to JSON number
+        takeProfit: tpRaw ? Number(tpRaw) : null,
         requestId: e.data['requestId'] ?? null,
       });
 

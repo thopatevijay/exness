@@ -41,3 +41,22 @@ export function useCloseTrade() {
     },
   });
 }
+
+export type ModifyInput = {
+  stopLoss?: number | null;
+  takeProfit?: number | null;
+};
+
+export function useModifyTrade() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, body }: { orderId: string; body: ModifyInput }) =>
+      api<{ orderId: string; stopLoss: number | null; takeProfit: number | null; decimals: number }>(
+        `/api/v1/trade/${orderId}/modify`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['open-orders'] });
+    },
+  });
+}

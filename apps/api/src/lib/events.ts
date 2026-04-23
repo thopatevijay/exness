@@ -89,3 +89,50 @@ export async function publishOrderAdd(redis: Redis, snapshot: OpenOrderSnapshot)
 export async function publishOrderRemove(redis: Redis, orderId: string): Promise<void> {
   await redis.publish(ORDERS_CHANNEL, JSON.stringify({ kind: 'remove', orderId }));
 }
+
+export async function emitOrderModified(
+  redis: Redis,
+  args: {
+    orderId: string;
+    userId: string;
+    asset: Symbol;
+    side: Side;
+    stopLoss: bigint | null;
+    takeProfit: bigint | null;
+    requestId: string;
+  },
+): Promise<void> {
+  const ts = Date.now();
+  await redis.xadd(
+    STREAM,
+    'MAXLEN', '~', '10000',
+    '*',
+    'type', 'order_modified',
+    'orderId', args.orderId,
+    'userId', args.userId,
+    'asset', args.asset,
+    'side', args.side,
+    'stopLoss', args.stopLoss?.toString() ?? '',
+    'takeProfit', args.takeProfit?.toString() ?? '',
+    'requestId', args.requestId,
+    'ts', String(ts),
+  );
+}
+
+export async function publishOrderModify(redis: Redis, snapshot: OpenOrderSnapshot): Promise<void> {
+  await redis.publish(
+    ORDERS_CHANNEL,
+    JSON.stringify({
+      kind: 'modify',
+      order: {
+        ...snapshot,
+        margin: snapshot.margin.toString(),
+        openPrice: snapshot.openPrice.toString(),
+        liquidationPrice: snapshot.liquidationPrice.toString(),
+        stopLoss: snapshot.stopLoss?.toString() ?? null,
+        takeProfit: snapshot.takeProfit?.toString() ?? null,
+        openedAt: snapshot.openedAt?.toISOString() ?? null,
+      },
+    }),
+  );
+}

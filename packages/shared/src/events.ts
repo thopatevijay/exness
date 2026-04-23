@@ -53,8 +53,10 @@ export type OpenOrderSnapshot = {
   liquidationPrice: bigint;
   stopLoss: bigint | null;
   takeProfit: bigint | null;
+  openedAt?: Date;
 };
 
 export type OrderIndexEvent =
   | { kind: 'add'; order: OpenOrderSnapshot }
+  | { kind: 'modify'; order: OpenOrderSnapshot }
   | { kind: 'remove'; orderId: string };
