@@ -1,9 +1,9 @@
 'use client';
 
-import { useClosedOrders } from '@/hooks/useClosedOrders';
+import { format } from 'date-fns';
+import type { ClosedOrder } from '@/hooks/useClosedOrders';
 import { fmtPnl, fmtPrice, pnlClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 
 const REASON_BADGE = {
   manual: 'bg-[color:var(--color-bg-elevated)]',
@@ -12,15 +12,24 @@ const REASON_BADGE = {
   liquidation: 'bg-[color:var(--color-down)]/40',
 } as const;
 
-export function ClosedPositionsTable() {
-  const { data, fetchNextPage, hasNextPage, isLoading } = useClosedOrders();
-  const trades = data?.pages.flatMap((p) => p.trades) ?? [];
+type Props = {
+  trades: ClosedOrder[];
+  isLoading?: boolean;
+  hasNextPage?: boolean;
+  onLoadMore?: () => void;
+  emptyLabel?: string;
+};
 
-  if (isLoading) return <p className="p-2 text-sm">Loading...</p>;
+export function ClosedPositionsTable({
+  trades,
+  isLoading = false,
+  hasNextPage = false,
+  onLoadMore,
+  emptyLabel = 'No closed trades yet.',
+}: Props) {
+  if (isLoading && trades.length === 0) return <p className="p-2 text-sm">Loading...</p>;
   if (trades.length === 0) {
-    return (
-      <p className="p-3 text-sm text-[color:var(--color-fg-dim)]">No closed trades yet.</p>
-    );
+    return <p className="p-3 text-sm text-[color:var(--color-fg-dim)]">{emptyLabel}</p>;
   }
 
   return (
@@ -67,9 +76,9 @@ export function ClosedPositionsTable() {
           ))}
         </tbody>
       </table>
-      {hasNextPage && (
+      {hasNextPage && onLoadMore && (
         <button
-          onClick={() => fetchNextPage()}
+          onClick={onLoadMore}
           className="mx-auto mt-3 block rounded-md border border-[color:var(--color-border)] px-3 py-1 text-sm hover:bg-[color:var(--color-bg-elevated)]"
         >
           Load more

@@ -1,12 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { ClosedPositionsTable } from './ClosedPositionsTable';
 import { OpenPositionsTable } from './OpenPositionsTable';
+import { useClosedOrders } from '@/hooks/useClosedOrders';
 import { cn } from '@/lib/utils';
+
+const PREVIEW_LIMIT = 8;
 
 export function PositionsTabs() {
   const [tab, setTab] = useState<'open' | 'closed'>('open');
+  const { data, isLoading } = useClosedOrders();
+  const recent = useMemo(() => {
+    const all = data?.pages.flatMap((p) => p.trades) ?? [];
+    return all.slice(0, PREVIEW_LIMIT);
+  }, [data]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex border-b border-[color:var(--color-border)]">
@@ -28,26 +38,26 @@ export function PositionsTabs() {
         >
           Closed
         </button>
-        <div className="ml-auto flex items-center pr-3">
-          <Link
-            href="/dashboard/history"
-            className="text-xs text-[color:var(--color-fg-dim)] underline"
-          >
-            Full history →
-          </Link>
-        </div>
+        {tab === 'closed' && (
+          <div className="ml-auto flex items-center pr-3">
+            <Link
+              href="/dashboard/history"
+              className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
+            >
+              Full history →
+            </Link>
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-auto">
         {tab === 'open' ? (
           <OpenPositionsTable />
         ) : (
-          <p className="p-3 text-sm text-[color:var(--color-fg-dim)]">
-            See full history at{' '}
-            <Link href="/dashboard/history" className="underline">
-              /dashboard/history
-            </Link>
-            .
-          </p>
+          <ClosedPositionsTable
+            trades={recent}
+            isLoading={isLoading}
+            emptyLabel="No closed trades yet."
+          />
         )}
       </div>
     </div>
