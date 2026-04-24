@@ -14,7 +14,6 @@ import type { Redis } from 'ioredis';
 import type { IndexedOrder } from './index_.js';
 
 const STREAM = 'trade_executed';
-const ORDERS_CHANNEL = 'orders:events';
 
 export async function closeOrder(
   redis: Redis,
@@ -70,6 +69,9 @@ export async function closeOrder(
     return false;
   }
 
+  // Emit to trade_executed for ws-server fanout. The evaluator already removed
+  // the order from the in-process index optimistically, and our own
+  // cg:liq-index consumer will also see this order_closed (idempotent).
   await redis.xadd(
     STREAM, 'MAXLEN', '~', '10000', '*',
     'type', 'order_closed',
@@ -82,7 +84,6 @@ export async function closeOrder(
     'closeReason', reason,
     'ts', String(Date.now()),
   );
-  await redis.publish(ORDERS_CHANNEL, JSON.stringify({ kind: 'remove', orderId: order.orderId }));
 
   logger.info(
     { orderId: order.orderId, reason, pnl: pnlAmt.value.toString(), userId: order.userId },

@@ -3,7 +3,7 @@ import { add, exposure, pnl, toApi, type Side, type ValidLeverage } from '@exnes
 import { ASSET_DECIMALS, type CloseReason, type Symbol } from '@exness/shared';
 import type { Request, Response } from 'express';
 import { redis } from '../lib/redis.js';
-import { emitOrderClosed, publishOrderRemove } from '../lib/events.js';
+import { emitOrderClosed } from '../lib/events.js';
 import { getLatestPrice, requireFresh } from '../lib/latestPrice.js';
 import { ApiError } from '../middleware/error.js';
 import { tradesClosedTotal } from '../metrics.js';
@@ -89,7 +89,6 @@ export async function closeTrade(req: Request, res: Response): Promise<void> {
     closeReason: REASON,
     requestId: req.requestId,
   });
-  await publishOrderRemove(redis(), orderId);
   tradesClosedTotal.inc({ asset, reason: REASON });
 
   const bal = await db.balance.findUnique({ where: { userId } });

@@ -5,21 +5,8 @@ import { evaluateTick, type Tick } from './evaluator.js';
 import { startHealth } from './health.js';
 import { OrderIndex } from './index_.js';
 import { initMetrics } from './metrics.js';
+import { startOrderStreamConsumer } from './orderStream.js';
 import { rebuildIndex, startReconciler } from './reconciler.js';
-
-type OrderAddPayload = {
-  orderId: string;
-  userId: string;
-  asset: string;
-  side: string;
-  margin: string;
-  leverage: number;
-  openPrice: string;
-  liquidationPrice: string;
-  stopLoss: string | null;
-  takeProfit: string | null;
-  openedAt?: string;
-};
 
 async function main(): Promise<void> {
   const redisData = createRedis();
@@ -32,37 +19,9 @@ async function main(): Promise<void> {
   await rebuildIndex(index);
   initMetrics(redisData, index);
 
-  // 2. Subscribe to orders:events for live deltas
-  await redisPubSub.subscribe('orders:events');
-  redisPubSub.on('message', (channel, raw) => {
-    if (channel !== 'orders:events') return;
-    try {
-      const evt = JSON.parse(raw) as
-        | { kind: 'add'; order: OrderAddPayload }
-        | { kind: 'modify'; order: OrderAddPayload }
-        | { kind: 'remove'; orderId: string };
-      if (evt.kind === 'add' || evt.kind === 'modify') {
-        const o = evt.order;
-        index.add({
-          orderId: o.orderId,
-          userId: o.userId,
-          asset: o.asset as Symbol,
-          side: o.side as 'buy' | 'sell',
-          margin: BigInt(o.margin),
-          leverage: o.leverage,
-          openPrice: BigInt(o.openPrice),
-          liquidationPrice: BigInt(o.liquidationPrice),
-          stopLoss: o.stopLoss ? BigInt(o.stopLoss) : null,
-          takeProfit: o.takeProfit ? BigInt(o.takeProfit) : null,
-          openedAt: o.openedAt ? new Date(o.openedAt) : new Date(),
-        });
-      } else if (evt.kind === 'remove') {
-        index.remove(evt.orderId);
-      }
-    } catch (err) {
-      logger.error({ err }, 'orders:events parse failed');
-    }
-  });
+  // 2. Stream consumer: trade_executed via cg:liq-index for live order
+  //    lifecycle deltas. PEL gives at-least-once delivery across restarts.
+  await startOrderStreamConsumer(redisData, index);
 
   // 3. Evaluate against latest:* before subscribing to live ticks (catches
   //    crash-and-restart case: SL already crossed while worker was down)
@@ -74,7 +33,8 @@ async function main(): Promise<void> {
     await evaluateTick(redisData, index, sym, tick);
   }
 
-  // 4. Subscribe to live ticks
+  // 4. Subscribe to live price ticks (pub/sub — high-frequency, transient;
+  //    keeping as pub/sub is the right call for prices)
   await redisPubSub.psubscribe('prices:*');
   redisPubSub.on('pmessage', (_pat, channel, raw) => {
     const sym = channel.split(':')[1] as Symbol;
@@ -87,7 +47,7 @@ async function main(): Promise<void> {
     }
   });
 
-  // 5. Start reconciler
+  // 5. Start reconciler — backstops any drift the stream consumer might miss
   startReconciler(index);
 
   process.on('SIGINT', () => {

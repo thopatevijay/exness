@@ -3,7 +3,7 @@ import { liquidationPrice, toApi, type ValidLeverage } from '@exness/money';
 import { ASSET_DECIMALS, type OpenTradeInput } from '@exness/shared';
 import type { Request, Response } from 'express';
 import { redis } from '../lib/redis.js';
-import { emitOrderOpened, publishOrderAdd } from '../lib/events.js';
+import { emitOrderOpened } from '../lib/events.js';
 import { getLatestPrice, requireFresh } from '../lib/latestPrice.js';
 import { ApiError } from '../middleware/error.js';
 import { tradesOpenedTotal } from '../metrics.js';
@@ -77,19 +77,10 @@ export async function openTrade(req: Request, res: Response): Promise<void> {
     return inserted[0]!.id;
   });
 
-  // 6. Fire events after commit
+  // 6. Fire event after commit — stream carries the full snapshot so
+  //    liquidation-worker's cg:liq-index consumer can hydrate its index
+  //    without a DB lookup.
   await emitOrderOpened(redis(), {
-    orderId,
-    userId,
-    asset: input.asset,
-    side: input.type,
-    margin: BigInt(input.margin),
-    leverage: input.leverage,
-    openPrice: openSidePrice.value,
-    liquidationPrice: liq.value,
-    requestId: req.requestId,
-  });
-  await publishOrderAdd(redis(), {
     orderId,
     userId,
     asset: input.asset,
@@ -100,6 +91,7 @@ export async function openTrade(req: Request, res: Response): Promise<void> {
     liquidationPrice: liq.value,
     stopLoss: stopLoss?.value ?? null,
     takeProfit: takeProfit?.value ?? null,
+    requestId: req.requestId,
   });
 
   tradesOpenedTotal.inc({ asset: input.asset, side: input.type, leverage: String(input.leverage) });

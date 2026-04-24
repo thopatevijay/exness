@@ -2,7 +2,7 @@ import { getDb } from '@exness/db';
 import { ASSET_DECIMALS, type ModifyTradeInput, type Symbol } from '@exness/shared';
 import type { Side } from '@exness/money';
 import type { Request, Response } from 'express';
-import { emitOrderModified, publishOrderModify } from '../lib/events.js';
+import { emitOrderModified } from '../lib/events.js';
 import { redis } from '../lib/redis.js';
 import { ApiError } from '../middleware/error.js';
 
@@ -62,16 +62,9 @@ export async function modifyTrade(req: Request, res: Response): Promise<void> {
   const updated = await db.order.findUnique({ where: { id: orderId } });
   if (!updated) throw new ApiError(500, 'INTERNAL_ERROR', 'updated order vanished');
 
+  // Single event: full snapshot on trade_executed so cg:liq-index rebuilds
+  // the index entry from the stream alone.
   await emitOrderModified(redis(), {
-    orderId,
-    userId,
-    asset: order.asset as Symbol,
-    side,
-    stopLoss: updated.stopLoss,
-    takeProfit: updated.takeProfit,
-    requestId: req.requestId,
-  });
-  await publishOrderModify(redis(), {
     orderId,
     userId,
     asset: order.asset as Symbol,
@@ -83,6 +76,7 @@ export async function modifyTrade(req: Request, res: Response): Promise<void> {
     stopLoss: updated.stopLoss,
     takeProfit: updated.takeProfit,
     openedAt: updated.openedAt,
+    requestId: req.requestId,
   });
 
   const decimals = ASSET_DECIMALS[order.asset as Symbol];

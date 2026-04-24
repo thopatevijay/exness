@@ -1,8 +1,6 @@
 import { getDb } from '@exness/db';
 import { INITIAL_BALANCE } from '@exness/money';
 import type { Request, Response } from 'express';
-import { publishOrderRemove } from '../lib/events.js';
-import { redis } from '../lib/redis.js';
 
 export async function resetDemo(req: Request, res: Response): Promise<void> {
   const userId = req.userId!;
@@ -22,10 +20,10 @@ export async function resetDemo(req: Request, res: Response): Promise<void> {
     return rows.map((r) => r.id);
   });
 
-  const r = redis();
-  for (const id of deletedIds) {
-    await publishOrderRemove(r, id);
-  }
+  // No live event fires for reset: the liquidation-worker's 30 s reconciler
+  // will drop orphan entries from its index on the next pass. Worst case the
+  // index holds ghost entries for <30 s; close.ts's DB transaction safely
+  // returns "lost race" if a ghost ever tries to liquidate.
 
   res.status(200).json({
     ok: true,

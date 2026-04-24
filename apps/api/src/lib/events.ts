@@ -1,9 +1,8 @@
-import type { CloseReason, OpenOrderSnapshot, Symbol } from '@exness/shared';
+import type { CloseReason, Symbol } from '@exness/shared';
 import type { Side } from '@exness/money';
 import type { Redis } from 'ioredis';
 
 const STREAM = 'trade_executed';
-const ORDERS_CHANNEL = 'orders:events';
 
 export async function emitOrderOpened(
   redis: Redis,
@@ -16,6 +15,9 @@ export async function emitOrderOpened(
     leverage: number;
     openPrice: bigint;
     liquidationPrice: bigint;
+    stopLoss?: bigint | null;
+    takeProfit?: bigint | null;
+    openedAt?: Date;
     requestId: string;
   },
 ): Promise<void> {
@@ -33,6 +35,9 @@ export async function emitOrderOpened(
     'leverage', String(args.leverage),
     'openPrice', args.openPrice.toString(),
     'liquidationPrice', args.liquidationPrice.toString(),
+    'stopLoss', args.stopLoss?.toString() ?? '',
+    'takeProfit', args.takeProfit?.toString() ?? '',
+    'openedAt', args.openedAt?.toISOString() ?? '',
     'requestId', args.requestId,
     'ts', String(ts),
   );
@@ -69,27 +74,6 @@ export async function emitOrderClosed(
   );
 }
 
-export async function publishOrderAdd(redis: Redis, snapshot: OpenOrderSnapshot): Promise<void> {
-  await redis.publish(
-    ORDERS_CHANNEL,
-    JSON.stringify({
-      kind: 'add',
-      order: {
-        ...snapshot,
-        margin: snapshot.margin.toString(),
-        openPrice: snapshot.openPrice.toString(),
-        liquidationPrice: snapshot.liquidationPrice.toString(),
-        stopLoss: snapshot.stopLoss?.toString() ?? null,
-        takeProfit: snapshot.takeProfit?.toString() ?? null,
-      },
-    }),
-  );
-}
-
-export async function publishOrderRemove(redis: Redis, orderId: string): Promise<void> {
-  await redis.publish(ORDERS_CHANNEL, JSON.stringify({ kind: 'remove', orderId }));
-}
-
 export async function emitOrderModified(
   redis: Redis,
   args: {
@@ -97,8 +81,15 @@ export async function emitOrderModified(
     userId: string;
     asset: Symbol;
     side: Side;
+    // Full snapshot so a stream-only consumer (e.g. liquidation-worker's
+    // cg:liq-index) can rebuild an index entry without a DB lookup.
+    margin: bigint;
+    leverage: number;
+    openPrice: bigint;
+    liquidationPrice: bigint;
     stopLoss: bigint | null;
     takeProfit: bigint | null;
+    openedAt: Date;
     requestId: string;
   },
 ): Promise<void> {
@@ -112,27 +103,14 @@ export async function emitOrderModified(
     'userId', args.userId,
     'asset', args.asset,
     'side', args.side,
+    'margin', args.margin.toString(),
+    'leverage', String(args.leverage),
+    'openPrice', args.openPrice.toString(),
+    'liquidationPrice', args.liquidationPrice.toString(),
     'stopLoss', args.stopLoss?.toString() ?? '',
     'takeProfit', args.takeProfit?.toString() ?? '',
+    'openedAt', args.openedAt.toISOString(),
     'requestId', args.requestId,
     'ts', String(ts),
-  );
-}
-
-export async function publishOrderModify(redis: Redis, snapshot: OpenOrderSnapshot): Promise<void> {
-  await redis.publish(
-    ORDERS_CHANNEL,
-    JSON.stringify({
-      kind: 'modify',
-      order: {
-        ...snapshot,
-        margin: snapshot.margin.toString(),
-        openPrice: snapshot.openPrice.toString(),
-        liquidationPrice: snapshot.liquidationPrice.toString(),
-        stopLoss: snapshot.stopLoss?.toString() ?? null,
-        takeProfit: snapshot.takeProfit?.toString() ?? null,
-        openedAt: snapshot.openedAt?.toISOString() ?? null,
-      },
-    }),
   );
 }
