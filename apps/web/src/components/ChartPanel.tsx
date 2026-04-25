@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import {
   CandlestickSeries,
   ColorType,
@@ -197,6 +198,19 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 
+  // Per-asset display precision for the y-axis labels and the right-edge live
+  // price tag. Storage decimals (BTC=4, SOL=6) are still used for the math
+  // that feeds the series; this only governs how lightweight-charts *renders*
+  // those numbers to the user.
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    const dec = DISPLAY_DECIMALS[asset];
+    series.applyOptions({
+      priceFormat: { type: 'price', precision: dec, minMove: 1 / 10 ** dec },
+    });
+  }, [asset]);
+
   // Sync overlays to price lines (Liq / SL / TP — Entry is now the marker)
   useEffect(() => {
     const series = seriesRef.current;
@@ -245,13 +259,13 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
           </h2>
           {ohlc && (
             <div className="hidden items-center gap-3 font-mono text-[11px] tabular-nums md:flex">
-              <OhlcCell label="O" value={fmtFloat(ohlc.open, ohlc.decimal)} />
-              <OhlcCell label="H" value={fmtFloat(ohlc.high, ohlc.decimal)} />
-              <OhlcCell label="L" value={fmtFloat(ohlc.low, ohlc.decimal)} />
-              <OhlcCell label="C" value={fmtFloat(ohlc.close, ohlc.decimal)} />
+              <OhlcCell label="O" value={fmtFloat(ohlc.open, DISPLAY_DECIMALS[asset])} />
+              <OhlcCell label="H" value={fmtFloat(ohlc.high, DISPLAY_DECIMALS[asset])} />
+              <OhlcCell label="L" value={fmtFloat(ohlc.low, DISPLAY_DECIMALS[asset])} />
+              <OhlcCell label="C" value={fmtFloat(ohlc.close, DISPLAY_DECIMALS[asset])} />
               <span className={cn('text-[11px]', ohlcChangeClass(ohlc.diff))}>
                 {ohlc.diff >= 0 ? '+' : ''}
-                {ohlc.diff.toFixed(2)}{' '}
+                {ohlc.diff.toFixed(DISPLAY_DECIMALS[asset])}{' '}
                 ({ohlc.pct >= 0 ? '+' : ''}
                 {ohlc.pct.toFixed(2)}%)
               </span>

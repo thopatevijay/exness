@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -49,7 +50,10 @@ export function OrderPanel({ selected }: Props) {
   const exposure = marginUsd * leverage;
   // Long opens at ASK (the higher quote). Short opens at BID.
   const openPrice = type === 'buy' ? asset?.ask : asset?.bid;
+  // `decimals` = storage scale (used for input parsing + math). `displayDec`
+  // = how many digits the user sees (Exness/MT5 convention).
   const decimals = asset?.decimals ?? 4;
+  const displayDec = DISPLAY_DECIMALS[selected] ?? decimals;
   const liqPrice = openPrice
     ? type === 'buy'
       ? (openPrice * (1 - 1 / leverage)) / 10 ** decimals
@@ -200,11 +204,13 @@ export function OrderPanel({ selected }: Props) {
           <span className="text-[color:var(--color-fg-dim)]">
             Open price ({type === 'buy' ? 'ask' : 'bid'})
           </span>
-          <span className="font-mono">{openPrice ? fmtPrice(openPrice, decimals) : '—'}</span>
+          <span className="font-mono">
+            {openPrice ? fmtPrice(openPrice, decimals, displayDec) : '—'}
+          </span>
         </div>
         <div className="flex justify-between">
           <span className="text-[color:var(--color-fg-dim)]">Liquidation</span>
-          <span className="font-mono">{liqPrice ? liqPrice.toFixed(decimals) : '—'}</span>
+          <span className="font-mono">{liqPrice ? liqPrice.toFixed(displayDec) : '—'}</span>
         </div>
       </div>
 

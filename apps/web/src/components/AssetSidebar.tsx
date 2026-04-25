@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { useAssets, type AssetView } from '@/hooks/useAssets';
@@ -76,6 +77,7 @@ function InstrumentRow({
   const bid = live?.bid ?? asset.bid;
   const ask = live?.ask ?? asset.ask;
   const decimals = live?.decimals ?? asset.decimals;
+  const displayDec = DISPLAY_DECIMALS[asset.symbol] ?? decimals;
 
   // Signal — persistent direction of the last bid change. Defaults to null
   // until we observe a tick; sticks across re-renders so the user always
@@ -110,10 +112,10 @@ function InstrumentRow({
         <SignalIndicator signal={signal} />
       </span>
       <span className="flex items-center justify-end px-3 py-2.5">
-        <BidAskCell value={bid} decimals={decimals} />
+        <BidAskCell value={bid} decimals={decimals} displayDec={displayDec} />
       </span>
       <span className="flex items-center justify-end px-3 py-2.5">
-        <BidAskCell value={ask} decimals={decimals} />
+        <BidAskCell value={ask} decimals={decimals} displayDec={displayDec} />
       </span>
     </li>
   );
@@ -150,7 +152,15 @@ function SignalIndicator({ signal }: { signal: 'up' | 'down' | null }) {
   );
 }
 
-function BidAskCell({ value, decimals }: { value: number | null; decimals: number }) {
+function BidAskCell({
+  value,
+  decimals,
+  displayDec,
+}: {
+  value: number | null;
+  decimals: number;
+  displayDec: number;
+}) {
   const prev = useRef<number | null>(null);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
 
@@ -177,7 +187,7 @@ function BidAskCell({ value, decimals }: { value: number | null; decimals: numbe
         flash === null && 'text-[color:var(--color-fg)]',
       )}
     >
-      {value === null ? '—' : fmtPrice(value, decimals)}
+      {value === null ? '—' : fmtPrice(value, decimals, displayDec)}
     </span>
   );
 }

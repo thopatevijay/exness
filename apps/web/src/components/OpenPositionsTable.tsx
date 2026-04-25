@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import { toast } from 'sonner';
 import { useOpenOrders, type OpenOrder } from '@/hooks/useOpenOrders';
 import { useCloseTrade } from '@/hooks/useTradeMutations';
@@ -60,10 +61,10 @@ export function OpenPositionsTable({ onEditPosition }: Props) {
             <td className="px-2 py-2 text-right font-mono">${(t.margin / 100).toFixed(2)}</td>
             <td className="px-2 py-2 text-right font-mono">{t.leverage}x</td>
             <td className="px-2 py-2 text-right font-mono">
-              {fmtPrice(t.openPrice, t.decimals)}
+              {fmtPrice(t.openPrice, t.decimals, DISPLAY_DECIMALS[t.asset])}
             </td>
             <td className="px-2 py-2 text-right font-mono">
-              {fmtPrice(t.liquidationPrice, t.decimals)}
+              {fmtPrice(t.liquidationPrice, t.decimals, DISPLAY_DECIMALS[t.asset])}
             </td>
             <td className={cn('px-2 py-2 text-right font-mono', pnlClass(t.unrealizedPnl))}>
               {fmtPnl(t.unrealizedPnl)}

@@ -5,10 +5,16 @@ export function fmtUsd(value: number, decimals = 2): string {
   });
 }
 
-export function fmtPrice(value: number, decimals: number): string {
+// `decimals` is the *storage* scale (the divisor that turns the integer back
+// into a real-world price). `displayDecimals` controls the *rendered*
+// fractional-digit count and defaults to `decimals` when omitted. Splitting
+// the two lets us keep storage at full precision while displaying at the
+// asset's natural pip size (BTC=2, SOL=3, etc).
+export function fmtPrice(value: number, decimals: number, displayDecimals?: number): string {
+  const display = displayDecimals ?? decimals;
   return (value / 10 ** decimals).toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    minimumFractionDigits: display,
+    maximumFractionDigits: display,
   });
 }
 

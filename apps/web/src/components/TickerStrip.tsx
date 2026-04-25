@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import Image from 'next/image';
 import { useAssets, type AssetView } from '@/hooks/useAssets';
 import { PriceCell } from './PriceCell';
@@ -22,6 +23,7 @@ function TickerRow({ asset }: { asset: AssetView }) {
   const ask = live?.ask ?? asset.ask;
   const bid = live?.bid ?? asset.bid;
   const decimals = live?.decimals ?? asset.decimals;
+  const displayDec = DISPLAY_DECIMALS[asset.symbol] ?? decimals;
   return (
     <div className="flex items-center justify-between rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-4 py-3">
       <span className="flex items-center gap-3">
@@ -29,8 +31,18 @@ function TickerRow({ asset }: { asset: AssetView }) {
         <span className="text-sm font-medium">{asset.symbol}</span>
       </span>
       <span className="flex flex-col text-right">
-        <PriceCell value={ask} decimals={decimals} className="text-[color:var(--color-up)]" />
-        <PriceCell value={bid} decimals={decimals} className="text-[color:var(--color-down)]" />
+        <PriceCell
+          value={ask}
+          decimals={decimals}
+          displayDec={displayDec}
+          className="text-[color:var(--color-up)]"
+        />
+        <PriceCell
+          value={bid}
+          decimals={decimals}
+          displayDec={displayDec}
+          className="text-[color:var(--color-down)]"
+        />
       </span>
     </div>
   );

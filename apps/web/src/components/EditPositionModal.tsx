@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -99,7 +100,8 @@ export function EditPositionModal({ open, onOpenChange, order }: Props) {
   }
 
   if (!order) return null;
-  const openPriceDisplay = fmtPrice(order.openPrice, order.decimals);
+  const displayDec = DISPLAY_DECIMALS[order.asset] ?? order.decimals;
+  const openPriceDisplay = fmtPrice(order.openPrice, order.decimals, displayDec);
   const step = `0.${'0'.repeat(Math.max(0, order.decimals - 1))}1`;
 
   return (

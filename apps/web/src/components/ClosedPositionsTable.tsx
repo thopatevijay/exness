@@ -1,5 +1,6 @@
 'use client';
 
+import { DISPLAY_DECIMALS } from '@exness/shared';
 import { format } from 'date-fns';
 import type { ClosedOrder } from '@/hooks/useClosedOrders';
 import { fmtPnl, fmtPrice, pnlClass } from '@/lib/format';
@@ -59,10 +60,10 @@ export function ClosedPositionsTable({
               </td>
               <td className="px-2 py-2 text-right font-mono">{t.leverage}x</td>
               <td className="px-2 py-2 text-right font-mono">
-                {fmtPrice(t.openPrice, t.decimals)}
+                {fmtPrice(t.openPrice, t.decimals, DISPLAY_DECIMALS[t.asset])}
               </td>
               <td className="px-2 py-2 text-right font-mono">
-                {fmtPrice(t.closePrice, t.decimals)}
+                {fmtPrice(t.closePrice, t.decimals, DISPLAY_DECIMALS[t.asset])}
               </td>
               <td className="px-2 py-2">
                 <span className={cn('rounded-md px-2 py-0.5 text-xs', REASON_BADGE[t.closeReason])}>

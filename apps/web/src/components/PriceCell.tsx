@@ -7,11 +7,12 @@ import { cn } from '@/lib/utils';
 type Props = {
   value: number | null;
   decimals: number;
+  displayDec?: number;
   className?: string;
   stale?: boolean;
 };
 
-export function PriceCell({ value, decimals, className, stale = false }: Props) {
+export function PriceCell({ value, decimals, displayDec, className, stale = false }: Props) {
   const prev = useRef<number | null>(null);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
 
@@ -37,7 +38,7 @@ export function PriceCell({ value, decimals, className, stale = false }: Props) 
         className,
       )}
     >
-      {value === null ? '—' : fmtPrice(value, decimals)}
+      {value === null ? '—' : fmtPrice(value, decimals, displayDec)}
     </span>
   );
 }
