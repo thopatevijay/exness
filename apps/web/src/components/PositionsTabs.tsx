@@ -5,11 +5,16 @@ import { useMemo, useState } from 'react';
 import { ClosedPositionsTable } from './ClosedPositionsTable';
 import { OpenPositionsTable } from './OpenPositionsTable';
 import { useClosedOrders } from '@/hooks/useClosedOrders';
+import type { OpenOrder } from '@/hooks/useOpenOrders';
 import { cn } from '@/lib/utils';
 
 const PREVIEW_LIMIT = 8;
 
-export function PositionsTabs() {
+type Props = {
+  onEditPosition: (o: OpenOrder) => void;
+};
+
+export function PositionsTabs({ onEditPosition }: Props) {
   const [tab, setTab] = useState<'open' | 'closed'>('open');
   const { data, isLoading } = useClosedOrders();
   const recent = useMemo(() => {
@@ -51,7 +56,7 @@ export function PositionsTabs() {
       </div>
       <div className="flex-1 overflow-auto">
         {tab === 'open' ? (
-          <OpenPositionsTable />
+          <OpenPositionsTable onEditPosition={onEditPosition} />
         ) : (
           <ClosedPositionsTable
             trades={recent}

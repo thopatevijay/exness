@@ -5,16 +5,20 @@ import {
   ColorType,
   HistogramSeries,
   createChart,
+  type CandlestickData,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type MouseEventParams,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useCandles, type Candle } from '@/hooks/useCandles';
-import { useOpenOrders } from '@/hooks/useOpenOrders';
+import { useOpenOrders, type OpenOrder } from '@/hooks/useOpenOrders';
+import { useCloseTrade } from '@/hooks/useTradeMutations';
 import { usePrice } from '@/store/prices';
-import { fmtPnl, fmtPrice, pnlClass } from '@/lib/format';
+import { fmtPnl, pnlClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { TimeframePicker, type TF } from './TimeframePicker';
 
@@ -35,9 +39,10 @@ type Props = {
   tf: TF;
   onTfChange: (tf: TF) => void;
   overlays?: ChartOverlay[];
+  onEditPosition: (o: OpenOrder) => void;
 };
 
-export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
+export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPosition }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -47,18 +52,32 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
   const live = usePrice(asset);
   const { data: openOrders } = useOpenOrders();
 
-  // OHLC for the current (last) candle. High/Low/Close fold in the live mid
-  // so the readout updates on every price tick — matches the live-tick that
-  // mutates the chart's last bar in the effect below.
-  const ohlc = useMemo(() => computeOhlc(data?.candles ?? [], live), [data, live]);
+  // Bumped on chart pan/zoom so the position-marker overlays recompute their
+  // y-coordinates (priceToCoordinate output shifts when the user drags or
+  // zooms even though `live` and `data` haven't changed).
+  const [, setRangeTick] = useState(0);
 
-  // Cumulative unrealized P/L on positions in the currently-charted asset.
-  const assetPnl = useMemo(() => {
-    const positions = openOrders?.trades.filter((t) => t.asset === asset) ?? [];
-    return positions.length === 0
-      ? null
-      : positions.reduce((sum, t) => sum + t.unrealizedPnl, 0);
-  }, [openOrders, asset]);
+  // Candle the crosshair is currently hovering. When set, the OHLC readout
+  // shows that candle's values; when null we fall back to the latest bar
+  // (with the live mid folded in). Stored as float prices for easy display.
+  const [hoveredCandle, setHoveredCandle] = useState<CandlestickData | null>(null);
+
+  // Crosshair handler runs in a closure registered once; reach fresh `data`
+  // through this ref so it always reads the latest candles array.
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  const ohlc = useMemo(
+    () => computeOhlc(data?.candles ?? [], live, hoveredCandle),
+    [data, live, hoveredCandle],
+  );
+
+  const positions = useMemo(
+    () => openOrders?.trades.filter((t) => t.asset === asset) ?? [],
+    [openOrders, asset],
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -107,10 +126,48 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
     chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
     });
+
+    // When the user pans / zooms the chart, the y-coordinate corresponding to
+    // a fixed price changes. Bump rangeTick so the position-marker overlays
+    // recompute their `top` styles.
+    const ts = chart.timeScale();
+    const onRange = (): void => setRangeTick((n) => n + 1);
+    ts.subscribeVisibleLogicalRangeChange(onRange);
+
+    // Crosshair tracking → drives the cursor-locked OHLC readout above the
+    // chart. We look up the candle by `param.logical` (the bar index) from
+    // our own `data` rather than `param.seriesData` — the seriesData lookup
+    // proved unreliable across lightweight-charts versions, and we already
+    // have the candle data locally, so it's both faster and correct.
+    const onCrosshair = (param: MouseEventParams): void => {
+      if (param.time === undefined || param.logical === undefined) {
+        setHoveredCandle(null);
+        return;
+      }
+      const candles = dataRef.current?.candles ?? [];
+      const idx = Math.round(param.logical);
+      const c = candles[idx];
+      if (!c) {
+        setHoveredCandle(null);
+        return;
+      }
+      const scale = 10 ** c.decimal;
+      setHoveredCandle({
+        time: c.timestamp as UTCTimestamp,
+        open: c.open / scale,
+        high: c.high / scale,
+        low: c.low / scale,
+        close: c.close / scale,
+      });
+    };
+    chart.subscribeCrosshairMove(onCrosshair);
+
     chartRef.current = chart;
     seriesRef.current = series;
     volumeRef.current = volume;
     return () => {
+      ts.unsubscribeVisibleLogicalRangeChange(onRange);
+      chart.unsubscribeCrosshairMove(onCrosshair);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -133,14 +190,14 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
     volumeRef.current?.setData(
       candles.map((c) => ({
         time: c.timestamp as UTCTimestamp,
-        value: c.volume / 1e8, // qty stored at 8 decimals
+        value: c.volume / 1e8,
         color: c.close >= c.open ? UP_VOL : DOWN_VOL,
       })),
     );
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 
-  // Sync overlays to price lines
+  // Sync overlays to price lines (Liq / SL / TP — Entry is now the marker)
   useEffect(() => {
     const series = seriesRef.current;
     if (!series) return;
@@ -178,7 +235,7 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header row 1: asset name + OHLC readout + timeframe picker */}
+      {/* Header: asset name + OHLC readout + timeframe picker */}
       <div className="flex items-center justify-between gap-4 border-b border-[color:var(--color-border)] px-4 py-2">
         <div className="flex min-w-0 items-center gap-4">
           <h2 className="font-medium">
@@ -186,13 +243,13 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
           </h2>
           {ohlc && (
             <div className="hidden items-center gap-3 font-mono text-[11px] tabular-nums md:flex">
-              <OhlcCell label="O" value={fmtPrice(ohlc.open, ohlc.decimal)} />
-              <OhlcCell label="H" value={fmtPrice(ohlc.high, ohlc.decimal)} />
-              <OhlcCell label="L" value={fmtPrice(ohlc.low, ohlc.decimal)} />
-              <OhlcCell label="C" value={fmtPrice(ohlc.close, ohlc.decimal)} />
+              <OhlcCell label="O" value={fmtFloat(ohlc.open, ohlc.decimal)} />
+              <OhlcCell label="H" value={fmtFloat(ohlc.high, ohlc.decimal)} />
+              <OhlcCell label="L" value={fmtFloat(ohlc.low, ohlc.decimal)} />
+              <OhlcCell label="C" value={fmtFloat(ohlc.close, ohlc.decimal)} />
               <span className={cn('text-[11px]', ohlcChangeClass(ohlc.diff))}>
                 {ohlc.diff >= 0 ? '+' : ''}
-                {(ohlc.diff / 10 ** ohlc.decimal).toFixed(2)}{' '}
+                {ohlc.diff.toFixed(2)}{' '}
                 ({ohlc.pct >= 0 ? '+' : ''}
                 {ohlc.pct.toFixed(2)}%)
               </span>
@@ -202,19 +259,19 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
         <TimeframePicker value={tf} onChange={onTfChange} />
       </div>
 
-      {/* Chart canvas + floating P/L chip overlay */}
+      {/* Chart canvas + position markers */}
       <div className="relative flex-1">
         <div ref={containerRef} className="h-full w-full" />
-        {assetPnl !== null && (
-          <div
-            className={cn(
-              'pointer-events-none absolute right-2 top-2 rounded border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)]/85 px-2 py-1 font-mono text-xs tabular-nums backdrop-blur-sm',
-              pnlClass(assetPnl),
-            )}
-          >
-            {fmtPnl(assetPnl)} USD
-          </div>
-        )}
+
+        {/* In-chart position markers — replace static Entry price-lines */}
+        {positions.map((p) => (
+          <PositionMarker
+            key={p.orderId}
+            order={p}
+            series={seriesRef.current}
+            onEdit={onEditPosition}
+          />
+        ))}
       </div>
     </div>
   );
@@ -236,32 +293,142 @@ function ohlcChangeClass(diff: number): string {
 }
 
 type Ohlc = {
+  // Float prices (post-decimal-scaling). All four are in the asset's natural
+  // unit (e.g. dollars for BTC, not the bigint integer at 4 decimals).
   open: number;
   high: number;
   low: number;
   close: number;
-  decimal: number;
-  diff: number; // close − open, raw integer at `decimal` precision
-  pct: number;  // human percent (e.g. -0.06)
+  decimal: number; // for display formatting
+  diff: number;    // float, e.g. -29.47
+  pct: number;     // human percent, e.g. -0.04
 };
 
-// Compute OHLC for the most recent candle, folding in the live tick so the
-// readout matches what the chart's last-bar update is rendering.
+// Compute the OHLC values to display:
+//   - If the user is hovering a candle, use that candle's values directly
+//     (these come from lightweight-charts as floats).
+//   - Otherwise show the latest candle, folding in the live mid so H/L/C
+//     update on every WS tick (matches the chart's last-bar live update).
 function computeOhlc(
   candles: Candle[],
   live: { ask: number; bid: number; decimals: number } | undefined,
+  hovered: CandlestickData | null,
 ): Ohlc | null {
+  // Decimal precision is stable across candles for a given asset; pull from
+  // any candle (prefer the last so we have something even when hovering an
+  // unrelated point).
   const last = candles[candles.length - 1];
   if (!last) return null;
   const dec = last.decimal;
-  let { open, high, low, close } = last;
+
+  if (hovered) {
+    const open = hovered.open;
+    const close = hovered.close;
+    const diff = close - open;
+    const pct = open === 0 ? 0 : (diff / open) * 100;
+    return { open, high: hovered.high, low: hovered.low, close, decimal: dec, diff, pct };
+  }
+
+  // Latest-bar fallback (live-tick-aware). All values in `last` are stored
+  // as bigint-scaled integers; convert to floats once.
+  const scale = 10 ** dec;
+  let open = last.open / scale;
+  let high = last.high / scale;
+  let low = last.low / scale;
+  let close = last.close / scale;
   if (live && live.decimals === dec) {
-    const mid = Math.round((live.ask + live.bid) / 2);
-    high = Math.max(high, mid);
-    low = Math.min(low, mid);
-    close = mid;
+    const liveMid = (live.ask + live.bid) / 2 / scale;
+    high = Math.max(high, liveMid);
+    low = Math.min(low, liveMid);
+    close = liveMid;
   }
   const diff = close - open;
   const pct = open === 0 ? 0 : (diff / open) * 100;
   return { open, high, low, close, decimal: dec, diff, pct };
+}
+
+function fmtFloat(v: number, decimals: number): string {
+  return v.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+// Floating HTML pill anchored at the entry price's y-coordinate. Renders
+// over the chart canvas via absolute positioning. Clicking the body opens
+// the Edit modal (TP / SL); the ✕ button issues a direct close.
+function PositionMarker({
+  order,
+  series,
+  onEdit,
+}: {
+  order: OpenOrder;
+  series: ISeriesApi<'Candlestick'> | null;
+  onEdit: (o: OpenOrder) => void;
+}) {
+  const closeMut = useCloseTrade();
+  const isLong = order.type === 'buy';
+  const entryPrice = order.openPrice / 10 ** order.decimals;
+
+  // priceToCoordinate is sync; safe to call on every render. Returns null
+  // when the price is outside the visible price range — in that case we
+  // pin the marker to top or bottom of the canvas so it remains visible.
+  const yRaw = series ? series.priceToCoordinate(entryPrice) : null;
+  if (yRaw === null || yRaw === undefined) return null;
+  const y = yRaw;
+
+  async function onCloseClick(e: React.MouseEvent): Promise<void> {
+    e.stopPropagation();
+    try {
+      const r = await closeMut.mutateAsync(order.orderId);
+      toast.success(`Closed ${order.asset} — pnl ${fmtPnl(r.pnl)}`);
+    } catch {
+      toast.error('Close failed (may already be closed)');
+    }
+  }
+
+  return (
+    <div
+      // Anchor on the right side of the chart, vertically centred on the
+      // entry price. Right-padded enough to clear the price axis label.
+      className="absolute right-20"
+      style={{ top: `${y - 14}px` }}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onEdit(order)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onEdit(order);
+        }}
+        className={cn(
+          'flex cursor-pointer items-stretch divide-x divide-black/30 overflow-hidden rounded-sm border text-[11px] font-medium tabular-nums shadow-sm transition-opacity hover:opacity-90',
+          isLong
+            ? 'border-[color:var(--color-up)] bg-[color:var(--color-up)]/15 text-[color:var(--color-up)]'
+            : 'border-[color:var(--color-down)] bg-[color:var(--color-down)]/15 text-[color:var(--color-down)]',
+        )}
+        title={`Click to edit SL/TP for this ${isLong ? 'long' : 'short'} position`}
+      >
+        <span className="px-1.5 py-0.5">{isLong ? '▲' : '▼'}</span>
+        <span className="px-1.5 py-0.5 font-mono">${(order.margin / 100).toFixed(2)}</span>
+        <span
+          className={cn(
+            'px-1.5 py-0.5 font-mono text-[color:var(--color-fg)]',
+            pnlClass(order.unrealizedPnl),
+          )}
+        >
+          {fmtPnl(order.unrealizedPnl)}
+        </span>
+        <button
+          type="button"
+          onClick={onCloseClick}
+          disabled={closeMut.isPending}
+          aria-label="Close position"
+          className="bg-black/30 px-2 py-0.5 text-[color:var(--color-fg)] hover:bg-black/50 disabled:opacity-50"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
 }

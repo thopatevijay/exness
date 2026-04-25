@@ -1,18 +1,19 @@
 'use client';
 
-import { useState } from 'react';
 import { toast } from 'sonner';
-import { EditPositionModal } from './EditPositionModal';
 import { useOpenOrders, type OpenOrder } from '@/hooks/useOpenOrders';
 import { useCloseTrade } from '@/hooks/useTradeMutations';
 import { fmtPnl, fmtPrice, pnlClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-export function OpenPositionsTable() {
+type Props = {
+  onEditPosition: (o: OpenOrder) => void;
+};
+
+export function OpenPositionsTable({ onEditPosition }: Props) {
   const { data, isLoading } = useOpenOrders();
   const closeMut = useCloseTrade();
   const trades = data?.trades ?? [];
-  const [editing, setEditing] = useState<OpenOrder | null>(null);
 
   const handleClose = async (o: OpenOrder): Promise<void> => {
     try {
@@ -70,7 +71,7 @@ export function OpenPositionsTable() {
             <td className="px-2 py-2 text-right">
               <div className="inline-flex gap-1">
                 <button
-                  onClick={() => setEditing(t)}
+                  onClick={() => onEditPosition(t)}
                   className="rounded-md border border-[color:var(--color-border)] px-2 py-1 text-xs hover:bg-[color:var(--color-bg-elevated)]"
                 >
                   Edit
@@ -87,19 +88,6 @@ export function OpenPositionsTable() {
           </tr>
         ))}
       </tbody>
-      <tfoot>
-        <tr>
-          <td colSpan={8}>
-            <EditPositionModal
-              open={editing !== null}
-              onOpenChange={(v) => {
-                if (!v) setEditing(null);
-              }}
-              order={editing}
-            />
-          </td>
-        </tr>
-      </tfoot>
     </table>
   );
 }
