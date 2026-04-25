@@ -13,6 +13,7 @@
 
 import { getDb } from '@exness/db';
 import { logger } from '@exness/logger';
+import { applySpread } from '@exness/money';
 import { ASSET_DECIMALS, SYMBOLS, type Symbol } from '@exness/shared';
 
 const BINANCE_BY_SYMBOL: Record<Symbol, string> = {
@@ -100,7 +101,15 @@ async function insertKlinesAsTicks(asset: Symbol, klines: RawKline[]): Promise<n
     ) {
       continue;
     }
-    const toPriceInt = (n: number): string => BigInt(Math.round(n * priceScale)).toString();
+    // Binance kline prices are real-trade values (≈ mid). We store the BID
+    // in ticks so the chart's historical bars match the bid line that the
+    // live publisher writes — keeps the chart price consistent with the
+    // sidebar's Bid value and Exness's chart-line convention.
+    const toPriceInt = (n: number): string => {
+      const midScaled = BigInt(Math.round(n * priceScale));
+      const { bid } = applySpread({ value: midScaled, decimals });
+      return bid.value.toString();
+    };
     const volumeInt = Number.isFinite(volumeNum)
       ? BigInt(Math.round(volumeNum * qtyScale)).toString()
       : '0';

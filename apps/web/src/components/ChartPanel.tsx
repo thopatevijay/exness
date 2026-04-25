@@ -214,22 +214,24 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
     );
   }, [overlays]);
 
-  // Live-tick the last candle on every price frame from the WS store
+  // Live-tick the last candle on every price frame from the WS store. Uses
+  // the BID (matches Exness's chart-line convention) so the chart's right-
+  // edge live label aligns with the sidebar's Bid value.
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || !live || !data?.candles.length) return;
     const last = data.candles[data.candles.length - 1];
     if (!last) return;
     const dec = last.decimal;
-    const liveMid = (live.ask + live.bid) / 2 / 10 ** dec;
+    const liveBid = live.bid / 10 ** dec;
     const currentHigh = last.high / 10 ** dec;
     const currentLow = last.low / 10 ** dec;
     series.update({
       time: last.timestamp as UTCTimestamp,
       open: last.open / 10 ** dec,
-      high: Math.max(currentHigh, liveMid),
-      low: Math.min(currentLow, liveMid),
-      close: liveMid,
+      high: Math.max(currentHigh, liveBid),
+      low: Math.min(currentLow, liveBid),
+      close: liveBid,
     });
   }, [live, data]);
 
@@ -330,17 +332,18 @@ function computeOhlc(
   }
 
   // Latest-bar fallback (live-tick-aware). All values in `last` are stored
-  // as bigint-scaled integers; convert to floats once.
+  // as bigint-scaled integers; convert to floats once. Live update uses
+  // the BID side so the OHLC readout matches the bid-priced chart line.
   const scale = 10 ** dec;
   let open = last.open / scale;
   let high = last.high / scale;
   let low = last.low / scale;
   let close = last.close / scale;
   if (live && live.decimals === dec) {
-    const liveMid = (live.ask + live.bid) / 2 / scale;
-    high = Math.max(high, liveMid);
-    low = Math.min(low, liveMid);
-    close = liveMid;
+    const liveBid = live.bid / scale;
+    high = Math.max(high, liveBid);
+    low = Math.min(low, liveBid);
+    close = liveBid;
   }
   const diff = close - open;
   const pct = open === 0 ? 0 : (diff / open) * 100;

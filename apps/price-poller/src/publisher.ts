@@ -29,6 +29,10 @@ export async function publishTrade(redis: Redis, sym: Symbol, t: RawBinanceTrade
 
   const pipeline = redis.multi();
   pipeline.publish(`prices:${sym}`, priceUpdate);
+  // Stream the BID into trades:* so the chart's historical bars (ticks →
+  // CAGGs) match the bid price visible in the UI's sidebar / order panel.
+  // Matches Exness's chart-line convention. Open / close trade math still
+  // uses the full {ask, bid} pair from latest:* (handled elsewhere).
   pipeline.xadd(
     `trades:${sym}`,
     'MAXLEN',
@@ -38,7 +42,7 @@ export async function publishTrade(redis: Redis, sym: Symbol, t: RawBinanceTrade
     'symbol',
     sym,
     'price',
-    mid.value.toString(),
+    bid.value.toString(),
     'qty',
     parseBinancePrice(t.q, QTY_DECIMALS).value.toString(),
     'ts',

@@ -15,6 +15,7 @@
     "@exness/config": "workspace:*",
     "@exness/db": "workspace:*",
     "@exness/logger": "workspace:*",
+    "@exness/money": "workspace:*",
     "@exness/shared": "workspace:*",
     "ioredis": "5.10.1"
   },
