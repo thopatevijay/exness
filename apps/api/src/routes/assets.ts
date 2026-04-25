@@ -9,13 +9,13 @@ export async function getAssets(_req: Request, res: Response): Promise<void> {
   const rows = await getDb().asset.findMany({ where: { isActive: true } });
   const out = await Promise.all(
     rows.map(async (a) => {
-      let buyPrice: number | null = null;
-      let sellPrice: number | null = null;
+      let ask: number | null = null;
+      let bid: number | null = null;
       let ts: number | null = null;
       try {
         const latest = await getLatestPrice(redis(), a.symbol as Symbol);
-        buyPrice = toApi({ value: latest.buy, decimals: a.decimals }, a.decimals).value;
-        sellPrice = toApi({ value: latest.sell, decimals: a.decimals }, a.decimals).value;
+        ask = toApi({ value: latest.ask, decimals: a.decimals }, a.decimals).value;
+        bid = toApi({ value: latest.bid, decimals: a.decimals }, a.decimals).value;
         ts = latest.ts;
       } catch {
         // price unavailable; emit nulls for this asset
@@ -23,8 +23,8 @@ export async function getAssets(_req: Request, res: Response): Promise<void> {
       return {
         name: a.name,
         symbol: a.symbol,
-        buyPrice,
-        sellPrice,
+        ask,
+        bid,
         ts,
         decimals: a.decimals,
         imageUrl: a.imageUrl,

@@ -6,8 +6,10 @@ import { api } from '@/lib/api';
 export type AssetView = {
   name: string;
   symbol: 'BTC' | 'ETH' | 'SOL';
-  buyPrice: number | null;
-  sellPrice: number | null;
+  // Two-sided market quote. ask = price a long opens at (= "Buy" button).
+  // bid = price a long closes at (= "Sell" button).
+  ask: number | null;
+  bid: number | null;
   ts: number | null; // ms timestamp of last tick; null when no price history exists
   decimals: number;
   imageUrl: string;

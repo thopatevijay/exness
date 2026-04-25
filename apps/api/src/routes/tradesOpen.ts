@@ -20,7 +20,7 @@ export async function getOpenTrades(req: Request, res: Response): Promise<void> 
       let unrealizedPnl = 0;
       try {
         const latest = await getLatestPrice(redis(), asset);
-        const exit = { value: side === 'buy' ? latest.sell : latest.buy, decimals: dec };
+        const exit = { value: side === 'buy' ? latest.bid : latest.ask, decimals: dec };
         const exp = exposure({ value: o.margin, decimals: 2 }, o.leverage as ValidLeverage);
         const open = { value: o.openPrice, decimals: dec };
         // eslint-disable-next-line no-restricted-syntax -- api boundary: bigint cents to JSON number

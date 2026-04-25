@@ -10,19 +10,19 @@ const QTY_DECIMALS = 8;
 export async function publishTrade(redis: Redis, sym: Symbol, t: RawBinanceTrade): Promise<void> {
   const assetDecimals = ASSET_DECIMALS[sym];
   const mid = parseBinancePrice(t.p, assetDecimals);
-  const { buy, sell } = applySpread(mid);
+  const { ask, bid } = applySpread(mid);
   const ts = t.T;
 
   const priceUpdate = JSON.stringify({
     symbol: sym,
-    buy: buy.value.toString(),
-    sell: sell.value.toString(),
+    ask: ask.value.toString(),
+    bid: bid.value.toString(),
     decimals: assetDecimals,
     ts,
   });
   const latestPayload = JSON.stringify({
-    buy: buy.value.toString(),
-    sell: sell.value.toString(),
+    ask: ask.value.toString(),
+    bid: bid.value.toString(),
     decimals: assetDecimals,
     ts,
   });

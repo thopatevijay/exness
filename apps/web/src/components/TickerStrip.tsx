@@ -19,8 +19,8 @@ export function TickerStrip() {
 
 function TickerRow({ asset }: { asset: AssetView }) {
   const live = usePrice(asset.symbol);
-  const buy = live?.buy ?? asset.buyPrice;
-  const sell = live?.sell ?? asset.sellPrice;
+  const ask = live?.ask ?? asset.ask;
+  const bid = live?.bid ?? asset.bid;
   const decimals = live?.decimals ?? asset.decimals;
   return (
     <div className="flex items-center justify-between rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-4 py-3">
@@ -29,8 +29,8 @@ function TickerRow({ asset }: { asset: AssetView }) {
         <span className="text-sm font-medium">{asset.symbol}</span>
       </span>
       <span className="flex flex-col text-right">
-        <PriceCell value={buy} decimals={decimals} className="text-[color:var(--color-up)]" />
-        <PriceCell value={sell} decimals={decimals} className="text-[color:var(--color-down)]" />
+        <PriceCell value={ask} decimals={decimals} className="text-[color:var(--color-up)]" />
+        <PriceCell value={bid} decimals={decimals} className="text-[color:var(--color-down)]" />
       </span>
     </div>
   );

@@ -13,8 +13,8 @@ type WsMessage =
       type: 'price_updates';
       price_updates: {
         symbol: Symbol;
-        buyPrice: number;
-        sellPrice: number;
+        ask: number;
+        bid: number;
         decimals: number;
       }[];
     }
@@ -87,8 +87,8 @@ export function useExnessSocket(): void {
             const now = Date.now();
             for (const u of msg.price_updates) {
               setPrice(u.symbol, {
-                buy: u.buyPrice,
-                sell: u.sellPrice,
+                ask: u.ask,
+                bid: u.bid,
                 decimals: u.decimals,
                 ts: now,
               });

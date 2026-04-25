@@ -17,7 +17,8 @@ export async function openTrade(req: Request, res: Response): Promise<void> {
   // open against a stale fallback price.
   const latest = await getLatestPrice(redis(), input.asset);
   requireFresh(latest, 10_000);
-  const openSidePriceBigint = input.type === 'buy' ? latest.buy : latest.sell;
+  // Long opens at ASK (the higher quote). Short opens at BID (the lower quote).
+  const openSidePriceBigint = input.type === 'buy' ? latest.ask : latest.bid;
   const openSidePrice = { value: openSidePriceBigint, decimals };
 
   // 2. Liquidation price (per side + leverage)

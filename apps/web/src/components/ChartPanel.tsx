@@ -141,7 +141,7 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [] }: Props) {
     const last = data.candles[data.candles.length - 1];
     if (!last) return;
     const dec = last.decimal;
-    const liveMid = (live.buy + live.sell) / 2 / 10 ** dec;
+    const liveMid = (live.ask + live.bid) / 2 / 10 ** dec;
     const currentHigh = last.high / 10 ** dec;
     const currentLow = last.low / 10 ** dec;
     series.update({

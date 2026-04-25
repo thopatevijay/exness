@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import type { Symbol } from '@exness/shared';
 
 export type LivePrice = {
-  buy: number;
-  sell: number;
+  // ask = price a long opens at (= "Buy" button).
+  // bid = price a long closes at (= "Sell" button).
+  ask: number;
+  bid: number;
   decimals: number;
   ts: number;
 };

@@ -47,7 +47,8 @@ export function OrderPanel({ selected }: Props) {
   const leverage = watch('leverage');
 
   const exposure = marginUsd * leverage;
-  const openPrice = type === 'buy' ? asset?.buyPrice : asset?.sellPrice;
+  // Long opens at ASK (the higher quote). Short opens at BID.
+  const openPrice = type === 'buy' ? asset?.ask : asset?.bid;
   const decimals = asset?.decimals ?? 4;
   const liqPrice = openPrice
     ? type === 'buy'

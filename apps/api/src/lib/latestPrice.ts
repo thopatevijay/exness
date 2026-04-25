@@ -2,7 +2,7 @@ import { ASSET_DECIMALS, type Symbol } from '@exness/shared';
 import type { Redis } from 'ioredis';
 import { ApiError } from '../middleware/error.js';
 
-export type LatestPrice = { buy: bigint; sell: bigint; decimals: number; ts: number };
+export type LatestPrice = { ask: bigint; bid: bigint; decimals: number; ts: number };
 
 /**
  * Fetches the latest price for an asset with a two-tier fallback:
@@ -13,15 +13,33 @@ export type LatestPrice = { buy: bigint; sell: bigint; decimals: number; ts: num
  *
  * Throws `PRICE_UNAVAILABLE` only if neither key exists (never-seen asset,
  * cold boot, or both Redis + DB emptied).
+ *
+ * Accepts both the new `{ ask, bid, ... }` schema and the legacy
+ * `{ buy, sell, ... }` schema so existing keys from before the rename don't
+ * 503 the API during the rollout window. The legacy branch can be removed
+ * once all `latest:*` / `last:*` keys have been refreshed (they expire in
+ * 5 min anyway under normal poll cadence).
  */
 export async function getLatestPrice(redis: Redis, asset: Symbol): Promise<LatestPrice> {
   let raw = await redis.get(`latest:${asset}`);
   if (!raw) raw = await redis.get(`last:${asset}`);
   if (!raw) throw new ApiError(503, 'PRICE_UNAVAILABLE', `no price history for ${asset}`);
-  const parsed = JSON.parse(raw) as { buy: string; sell: string; decimals?: number; ts: number };
+  const parsed = JSON.parse(raw) as {
+    ask?: string;
+    bid?: string;
+    buy?: string;
+    sell?: string;
+    decimals?: number;
+    ts: number;
+  };
+  const askStr = parsed.ask ?? parsed.buy;
+  const bidStr = parsed.bid ?? parsed.sell;
+  if (!askStr || !bidStr) {
+    throw new ApiError(503, 'PRICE_UNAVAILABLE', `corrupt cached price for ${asset}`);
+  }
   return {
-    buy: BigInt(parsed.buy),
-    sell: BigInt(parsed.sell),
+    ask: BigInt(askStr),
+    bid: BigInt(bidStr),
     decimals: parsed.decimals ?? ASSET_DECIMALS[asset],
     ts: parsed.ts,
   };

@@ -35,8 +35,9 @@ export async function closeTrade(req: Request, res: Response): Promise<void> {
   // Close must also settle against a fresh price — stale fallback would
   // distort the realized PnL that goes into the DB and the user's history.
   requireFresh(latest, 10_000);
+  // Long closes at BID (sells back at the lower quote). Short closes at ASK.
   const exitPrice = {
-    value: side === 'buy' ? latest.sell : latest.buy,
+    value: side === 'buy' ? latest.bid : latest.ask,
     decimals,
   };
 

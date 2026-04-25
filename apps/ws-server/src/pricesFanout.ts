@@ -14,17 +14,27 @@ export function startPricesFanout(redis: Redis, reg: SubscriptionRegistry): void
     const sym = channel.split(':')[1] as Symbol;
     const dec = ASSET_DECIMALS[sym];
     if (!dec) return;
-    const parsed = JSON.parse(raw) as { buy: string; sell: string; ts: number };
-    const buy = { value: BigInt(parsed.buy), decimals: dec };
-    const sell = { value: BigInt(parsed.sell), decimals: dec };
+    // Accept ask/bid (new) or buy/sell (old) for the rollout window.
+    const parsed = JSON.parse(raw) as {
+      ask?: string;
+      bid?: string;
+      buy?: string;
+      sell?: string;
+      ts: number;
+    };
+    const askStr = parsed.ask ?? parsed.buy;
+    const bidStr = parsed.bid ?? parsed.sell;
+    if (!askStr || !bidStr) return;
+    const ask = { value: BigInt(askStr), decimals: dec };
+    const bid = { value: BigInt(bidStr), decimals: dec };
 
     const frame = JSON.stringify({
       type: 'price_updates',
       price_updates: [
         {
           symbol: sym,
-          buyPrice: toApi(buy, dec).value,
-          sellPrice: toApi(sell, dec).value,
+          ask: toApi(ask, dec).value,
+          bid: toApi(bid, dec).value,
           decimals: dec,
         },
       ],

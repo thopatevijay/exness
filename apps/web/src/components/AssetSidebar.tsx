@@ -73,9 +73,8 @@ function InstrumentRow({
   onSelect: () => void;
 }) {
   const live = usePrice(asset.symbol);
-  // Bid = Sell button = lower price.  Ask = Buy button = higher price.
-  const bid = live?.sell ?? asset.sellPrice;
-  const ask = live?.buy ?? asset.buyPrice;
+  const bid = live?.bid ?? asset.bid;
+  const ask = live?.ask ?? asset.ask;
   const decimals = live?.decimals ?? asset.decimals;
 
   // Signal — persistent direction of the last bid change. Defaults to null

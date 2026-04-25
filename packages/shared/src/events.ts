@@ -1,10 +1,14 @@
 import type { Side } from '@exness/money';
 import type { Symbol } from './symbols.js';
 
+// Two-sided market quote. `ask` is the price a long opens at (= "Buy" button
+// in the UI); `bid` is the price a long closes at (= "Sell" button).
+// "buy" / "sell" labels are kept on the action verbs (orders.side, OpenTrade)
+// but the *quote* fields use the industry-standard ask / bid.
 export type PriceUpdate = {
   symbol: Symbol;
-  buy: bigint;
-  sell: bigint;
+  ask: bigint;
+  bid: bigint;
   ts: number;
 };
 
