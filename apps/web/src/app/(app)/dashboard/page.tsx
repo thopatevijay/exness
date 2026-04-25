@@ -7,15 +7,21 @@ import { BalanceBar } from '@/components/BalanceBar';
 import { ChartPanel, type ChartOverlay } from '@/components/ChartPanel';
 import { OrderPanel } from '@/components/OrderPanel';
 import { PositionsTabs } from '@/components/PositionsTabs';
+import { ResizeHandle } from '@/components/ResizeHandle';
 import { SettingsPopover } from '@/components/SettingsPopover';
 import { StatusStrip } from '@/components/StatusStrip';
 import type { TF } from '@/components/TimeframePicker';
 import type { AssetView } from '@/hooks/useAssets';
 import { useOpenOrders } from '@/hooks/useOpenOrders';
 
+const SIDEBAR_MIN = 300;
+const SIDEBAR_MAX = 600;
+const SIDEBAR_DEFAULT = 400;
+
 export default function DashboardPage() {
   const [asset, setAsset] = useState<AssetView['symbol']>('BTC');
   const [tf, setTf] = useState<TF>('1m');
+  const [sidebarW, setSidebarW] = useState(SIDEBAR_DEFAULT);
   const { data: openOrders } = useOpenOrders();
 
   const overlays: ChartOverlay[] = useMemo(() => {
@@ -58,8 +64,16 @@ export default function DashboardPage() {
           <SettingsPopover />
         </div>
       </header>
-      <div className="grid grid-cols-[280px_1fr_320px] overflow-hidden">
+      <div
+        className="grid overflow-hidden"
+        style={{ gridTemplateColumns: `${sidebarW}px 4px 1fr 320px` }}
+      >
         <AssetSidebar selected={asset} onSelect={setAsset} />
+        <ResizeHandle
+          onResize={(dx) =>
+            setSidebarW((w) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, w + dx)))
+          }
+        />
         <div className="flex flex-col">
           <BalanceBar />
           <div className="flex-1 overflow-hidden">
