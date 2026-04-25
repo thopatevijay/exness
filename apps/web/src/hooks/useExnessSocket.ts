@@ -34,10 +34,6 @@ type WsMessage =
 
 export function useExnessSocket(): void {
   const qc = useQueryClient();
-  const setPrice = usePricesStore((s) => s.setPrice);
-  const setWsLatency = usePricesStore((s) => s.setWsLatency);
-  const setWsConnected = usePricesStore((s) => s.setWsConnected);
-  const reset = usePricesStore((s) => s.reset);
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(1_000);
   const closedRef = useRef(false);
@@ -45,6 +41,13 @@ export function useExnessSocket(): void {
 
   useEffect(() => {
     closedRef.current = false;
+    // Pull store actions imperatively. Subscribing via selectors and listing
+    // the resulting fns in this effect's dep array is fragile (any perceived
+    // ref-instability causes the effect to tear down + reopen the WS, which
+    // in dev with React StrictMode + HMR can degenerate into a render storm).
+    // The actions are stable for the life of the store, so getState() is
+    // both correct and simpler.
+    const { setPrices, setWsLatency, setWsConnected, reset } = usePricesStore.getState();
 
     const connect = async (): Promise<void> => {
       let token: string | null = null;
@@ -85,14 +88,14 @@ export function useExnessSocket(): void {
 
           if (msg.type === 'price_updates') {
             const now = Date.now();
-            for (const u of msg.price_updates) {
-              setPrice(u.symbol, {
-                ask: u.ask,
-                bid: u.bid,
-                decimals: u.decimals,
-                ts: now,
-              });
-            }
+            // Single store write per WS frame — collapses N symbol updates
+            // into one Map allocation + one re-render burst.
+            setPrices(
+              msg.price_updates.map((u) => [
+                u.symbol,
+                { ask: u.ask, bid: u.bid, decimals: u.decimals, ts: now },
+              ]),
+            );
           } else if (msg.type === 'order_update') {
             qc.invalidateQueries({ queryKey: ['open-orders'] });
             qc.invalidateQueries({ queryKey: ['closed-orders'] });
@@ -158,5 +161,5 @@ export function useExnessSocket(): void {
       wsRef.current?.close();
       reset();
     };
-  }, [qc, setPrice, setWsLatency, setWsConnected, reset]);
+  }, [qc]);
 }

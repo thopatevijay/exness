@@ -15,6 +15,9 @@ type PricesState = {
   wsLatencyMs: number | null;
   wsLastConnectAt: number | null;
   setPrice: (sym: Symbol, p: LivePrice) => void;
+  // Batched setter — collapses N symbol updates from one WS frame into a
+  // single store write. Reduces Map allocations + downstream re-renders.
+  setPrices: (updates: Array<[Symbol, LivePrice]>) => void;
   setWsLatency: (ms: number) => void;
   setWsConnected: (at: number) => void;
   reset: () => void;
@@ -30,6 +33,14 @@ export const usePricesStore = create<PricesState>((set) => ({
       next.set(sym, p);
       return { prices: next };
     }),
+  setPrices: (updates) => {
+    if (updates.length === 0) return;
+    set((s) => {
+      const next = new Map(s.prices);
+      for (const [sym, p] of updates) next.set(sym, p);
+      return { prices: next };
+    });
+  },
   setWsLatency: (ms) => set({ wsLatencyMs: ms }),
   setWsConnected: (at) => set({ wsLastConnectAt: at }),
   reset: () => set({ prices: new Map(), wsLatencyMs: null, wsLastConnectAt: null }),
