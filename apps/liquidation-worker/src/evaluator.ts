@@ -4,7 +4,9 @@ import type { Redis } from 'ioredis';
 import { closeOrder } from './close.js';
 import type { IndexedOrder, OrderIndex } from './index_.js';
 
-export type Tick = { buy: bigint; sell: bigint };
+// Wire shape — ask = price to buy, bid = price to sell. Matches the
+// {ask, bid} keys we publish on `latest:*` and `prices:*`.
+export type Tick = { ask: bigint; bid: bigint };
 
 export async function evaluateTick(
   redis: Redis,
@@ -12,35 +14,35 @@ export async function evaluateTick(
   asset: Symbol,
   tick: Tick,
 ): Promise<void> {
-  // Longs exit at SELL price.
+  // Longs (orders.side='buy') exit at the BID — you sell to close.
   // Order matters: liquidation first (it dwarfs SL/TP), then SL, then TP.
   for (const o of index.iterate(asset, 'buy')) {
-    if (tick.sell <= o.liquidationPrice) {
-      void closeAndRemove(redis, index, o, tick.sell, 'liquidation');
+    if (tick.bid <= o.liquidationPrice) {
+      void closeAndRemove(redis, index, o, tick.bid, 'liquidation');
       continue;
     }
-    if (o.stopLoss !== null && tick.sell <= o.stopLoss) {
-      void closeAndRemove(redis, index, o, tick.sell, 'sl');
+    if (o.stopLoss !== null && tick.bid <= o.stopLoss) {
+      void closeAndRemove(redis, index, o, tick.bid, 'sl');
       continue;
     }
-    if (o.takeProfit !== null && tick.sell >= o.takeProfit) {
-      void closeAndRemove(redis, index, o, tick.sell, 'tp');
+    if (o.takeProfit !== null && tick.bid >= o.takeProfit) {
+      void closeAndRemove(redis, index, o, tick.bid, 'tp');
       continue;
     }
   }
 
-  // Shorts exit at BUY price.
+  // Shorts (orders.side='sell') exit at the ASK — you buy to close.
   for (const o of index.iterate(asset, 'sell')) {
-    if (tick.buy >= o.liquidationPrice) {
-      void closeAndRemove(redis, index, o, tick.buy, 'liquidation');
+    if (tick.ask >= o.liquidationPrice) {
+      void closeAndRemove(redis, index, o, tick.ask, 'liquidation');
       continue;
     }
-    if (o.stopLoss !== null && tick.buy >= o.stopLoss) {
-      void closeAndRemove(redis, index, o, tick.buy, 'sl');
+    if (o.stopLoss !== null && tick.ask >= o.stopLoss) {
+      void closeAndRemove(redis, index, o, tick.ask, 'sl');
       continue;
     }
-    if (o.takeProfit !== null && tick.buy <= o.takeProfit) {
-      void closeAndRemove(redis, index, o, tick.buy, 'tp');
+    if (o.takeProfit !== null && tick.ask <= o.takeProfit) {
+      void closeAndRemove(redis, index, o, tick.ask, 'tp');
       continue;
     }
   }

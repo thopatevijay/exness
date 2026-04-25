@@ -28,8 +28,8 @@ async function main(): Promise<void> {
   for (const sym of SYMBOLS) {
     const raw = await redisData.get(`latest:${sym}`);
     if (!raw) continue;
-    const p = JSON.parse(raw) as { buy: string; sell: string };
-    const tick: Tick = { buy: BigInt(p.buy), sell: BigInt(p.sell) };
+    const p = JSON.parse(raw) as { ask: string; bid: string };
+    const tick: Tick = { ask: BigInt(p.ask), bid: BigInt(p.bid) };
     await evaluateTick(redisData, index, sym, tick);
   }
 
@@ -40,8 +40,8 @@ async function main(): Promise<void> {
     const sym = channel.split(':')[1] as Symbol;
     if (!SYMBOLS.includes(sym)) return;
     try {
-      const p = JSON.parse(raw) as { buy: string; sell: string };
-      void evaluateTick(redisData, index, sym, { buy: BigInt(p.buy), sell: BigInt(p.sell) });
+      const p = JSON.parse(raw) as { ask: string; bid: string };
+      void evaluateTick(redisData, index, sym, { ask: BigInt(p.ask), bid: BigInt(p.bid) });
     } catch (err) {
       logger.error({ err }, 'price tick parse failed');
     }
