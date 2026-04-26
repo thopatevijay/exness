@@ -22,7 +22,7 @@ const BINANCE_BY_SYMBOL: Record<Symbol, string> = {
   SOL: 'SOLUSDT',
 };
 
-const STARTUP_BACKFILL_DAYS = 7;
+const STARTUP_BACKFILL_DAYS = 365;
 const GAP_THRESHOLD_MS = 2 * 60_000;
 const BINANCE_KLINE_PAGE = 1000;
 const MS_PER_MINUTE = 60_000;
