@@ -1,5 +1,5 @@
 import { getDb } from '@exness/db';
-import { add, exposure, pnl, toApi, type Side, type ValidLeverage } from '@exness/money';
+import { exposure, pnl, toApi, type Side, type ValidLeverage } from '@exness/money';
 import { ASSET_DECIMALS, type CloseReason, type Symbol } from '@exness/shared';
 import type { Request, Response } from 'express';
 import { redis } from '../lib/redis.js';
@@ -45,7 +45,6 @@ export async function closeTrade(req: Request, res: Response): Promise<void> {
   const exposureUsd = exposure(margin, order.leverage as ValidLeverage);
   const open = { value: order.openPrice, decimals };
   const pnlAmt = pnl(side, exposureUsd, open, exitPrice);
-  const credit = add(margin, pnlAmt);
 
   const closed = await db.$transaction(async (tx) => {
     const deleted = await tx.$queryRawUnsafe<{ id: string }[]>(
@@ -56,7 +55,7 @@ export async function closeTrade(req: Request, res: Response): Promise<void> {
     if (deleted.length === 0) return null;
     await tx.$executeRawUnsafe(
       `UPDATE balances SET usd_balance = usd_balance + $1::bigint, updated_at = now() WHERE user_id = $2::uuid`,
-      credit.value,
+      pnlAmt.value,
       userId,
     );
     await tx.$executeRawUnsafe(

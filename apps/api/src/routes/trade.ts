@@ -45,7 +45,6 @@ export async function openTrade(req: Request, res: Response): Promise<void> {
     }
   }
 
-  // 5. Postgres txn: SELECT FOR UPDATE on balance, debit margin, insert order
   const db = getDb();
   const orderId = await db.$transaction(async (tx) => {
     const rows = await tx.$queryRawUnsafe<{ usd_balance: bigint }[]>(
@@ -53,14 +52,16 @@ export async function openTrade(req: Request, res: Response): Promise<void> {
       userId,
     );
     if (rows.length === 0) throw new ApiError(500, 'INTERNAL_ERROR', 'no balance row');
-    if (rows[0]!.usd_balance < BigInt(input.margin)) {
-      throw new ApiError(400, 'INSUFFICIENT_BALANCE', 'margin exceeds balance');
-    }
-    await tx.$executeRawUnsafe(
-      `UPDATE balances SET usd_balance = usd_balance - $1::bigint, updated_at = now() WHERE user_id = $2::uuid`,
-      input.margin,
+    const balance = rows[0]!.usd_balance;
+    const lockedRows = await tx.$queryRawUnsafe<{ locked: bigint | null }[]>(
+      `SELECT COALESCE(SUM(margin), 0)::bigint AS locked FROM orders WHERE user_id = $1::uuid`,
       userId,
     );
+    const lockedMargin = lockedRows[0]?.locked ?? 0n;
+    const freeMargin = balance - lockedMargin;
+    if (freeMargin < BigInt(input.margin)) {
+      throw new ApiError(400, 'INSUFFICIENT_BALANCE', 'free margin below requested margin');
+    }
     const inserted = await tx.$queryRawUnsafe<{ id: string }[]>(
       `INSERT INTO orders (user_id, asset, side, margin, leverage, open_price, stop_loss, take_profit, liquidation_price)
        VALUES ($1::uuid, $2, $3, $4::bigint, $5::smallint, $6::bigint, $7::bigint, $8::bigint, $9::bigint)

@@ -1,6 +1,5 @@
 import { getDb } from '@exness/db';
 import {
-  add,
   exposure,
   max as maxAmount,
   negate,
@@ -31,7 +30,6 @@ export async function closeOrder(
     // Clamp PnL to -margin so user never owes more than posted margin.
     pnlAmt = maxAmount(pnlAmt, negate(margin));
   }
-  const credit = add(margin, pnlAmt);
 
   const db = getDb();
   const wonRace = await db.$transaction(async (tx) => {
@@ -42,7 +40,7 @@ export async function closeOrder(
     if (deleted.length === 0) return false; // someone else won the close race
     await tx.$executeRawUnsafe(
       `UPDATE balances SET usd_balance = usd_balance + $1::bigint, updated_at = now() WHERE user_id = $2::uuid`,
-      credit.value,
+      pnlAmt.value,
       order.userId,
     );
     await tx.$executeRawUnsafe(
