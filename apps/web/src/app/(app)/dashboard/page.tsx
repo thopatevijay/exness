@@ -10,7 +10,6 @@ import { OrderPanel } from '@/components/OrderPanel';
 import { PositionsTabs } from '@/components/PositionsTabs';
 import { ResizeHandle } from '@/components/ResizeHandle';
 import { SettingsPopover } from '@/components/SettingsPopover';
-import { StatusStrip } from '@/components/StatusStrip';
 import type { TF } from '@/components/TimeframePicker';
 import type { AssetView } from '@/hooks/useAssets';
 import { useOpenOrders, type OpenOrder } from '@/hooks/useOpenOrders';
@@ -52,14 +51,15 @@ export default function DashboardPage() {
   return (
     <div className="grid h-screen grid-rows-[auto_1fr_auto]">
       <header className="flex items-center justify-between border-b border-[color:var(--color-border)] px-6 py-3">
-        <span className="text-base font-semibold">Exness</span>
+        <span className="text-2xl font-bold tracking-tight text-[oklch(0.85_0.18_85)]">
+          Exness
+        </span>
         <div className="flex items-center gap-6">
-          <StatusStrip />
           <Link
             href="/dashboard/ops"
             className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
           >
-            Ops
+            Health
           </Link>
           <SettingsPopover />
         </div>

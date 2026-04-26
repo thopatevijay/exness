@@ -55,10 +55,15 @@ export function SettingsPopover() {
     <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
       <Popover.Trigger asChild>
         <button
-          aria-label="Settings"
-          className="rounded-md border border-[color:var(--color-border)] p-1.5 hover:bg-[color:var(--color-bg-elevated)]"
+          type="button"
+          aria-label="Account"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[color:var(--color-border)] px-2.5 py-1 text-xs hover:bg-[color:var(--color-bg-elevated)]"
         >
-          <Settings size={16} />
+          <span className="rounded-sm bg-[color:var(--color-up)]/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-up)]">
+            Demo
+          </span>
+          <span className="font-mono tabular-nums">${fmtUsd(balanceCents)}</span>
+          <Settings size={14} className="text-[color:var(--color-fg-dim)]" />
         </button>
       </Popover.Trigger>
       {isOpen && (

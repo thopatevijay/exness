@@ -14,7 +14,7 @@ export default function OpsPage() {
   return (
     <main className="min-h-screen p-6">
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Ops</h1>
+        <h1 className="text-2xl font-semibold">Health</h1>
         <Link
           href="/dashboard"
           className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
