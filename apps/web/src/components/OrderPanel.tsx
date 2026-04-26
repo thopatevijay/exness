@@ -2,7 +2,7 @@
 
 import { DISPLAY_DECIMALS } from '@exness/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -27,12 +27,15 @@ type Input = z.infer<typeof Schema>;
 
 const LEVERAGES = [1, 5, 10, 20, 100] as const;
 
+type Side = 'buy' | 'sell';
+
 type Props = { selected: 'BTC' | 'ETH' | 'SOL' };
 
 export function OrderPanel({ selected }: Props) {
   const { data: assetsData } = useAssets();
   const live = usePrice(selected);
   const open = useOpenTrade();
+  const [stagedSide, setStagedSide] = useState<Side | null>(null);
 
   const { control, register, handleSubmit, setValue, watch } = useForm<Input>({
     resolver: zodResolver(Schema),
@@ -40,9 +43,12 @@ export function OrderPanel({ selected }: Props) {
   });
   const marginUsd = watch('marginUsd') ?? 0;
   const leverage = watch('leverage');
+  const slPrice = watch('stopLossPrice');
+  const tpPrice = watch('takeProfitPrice');
 
   useEffect(() => {
     setValue('asset', selected);
+    setStagedSide(null);
   }, [selected, setValue]);
 
   const asset = assetsData?.assets.find((a) => a.symbol === selected);
@@ -72,15 +78,19 @@ export function OrderPanel({ selected }: Props) {
       ? (marginUsd * leverage * (ask - bid)) / ((ask + bid) / 2)
       : null;
 
-  // The side ('buy' / 'sell') is no longer a form field — it comes from
-  // which mega-button the user pressed. submitSide(side) returns a
-  // submit handler bound to that side.
-  const submitSide = (side: 'buy' | 'sell') =>
-    handleSubmit(async (data) => {
+  const stageSide = (side: Side) =>
+    handleSubmit(() => {
+      if (ask === null || bid === null) return;
+      setStagedSide(side);
+    });
+
+  const confirm = async (): Promise<void> => {
+    if (stagedSide === null) return;
+    await handleSubmit(async (data) => {
       try {
         const payload: OpenInput = {
           asset: data.asset,
-          type: side,
+          type: stagedSide,
           margin: Math.round(data.marginUsd * 100), // dollars → cents
           leverage: data.leverage,
         };
@@ -91,12 +101,14 @@ export function OrderPanel({ selected }: Props) {
           payload.takeProfit = Math.round(data.takeProfitPrice * 10 ** decimals);
         }
         await open.mutateAsync(payload);
-        toast.success(`Opened ${side.toUpperCase()} ${data.asset} ${data.leverage}x`);
+        toast.success(`Opened ${stagedSide.toUpperCase()} ${data.asset} ${data.leverage}x`);
+        setStagedSide(null);
       } catch (err) {
         if (err instanceof ApiResponseError) toast.error(err.message);
         else toast.error('Network error');
       }
-    });
+    })();
+  };
 
   return (
     <form className="space-y-3">
@@ -111,7 +123,7 @@ export function OrderPanel({ selected }: Props) {
           decimals={decimals}
           displayDec={displayDec}
           disabled={open.isPending}
-          onClick={submitSide('sell')}
+          onClick={stageSide('sell')}
         />
         <SpreadPill costUsd={spreadCostUsd} />
         <PriceButton
@@ -121,7 +133,7 @@ export function OrderPanel({ selected }: Props) {
           decimals={decimals}
           displayDec={displayDec}
           disabled={open.isPending}
-          onClick={submitSide('buy')}
+          onClick={stageSide('buy')}
         />
       </div>
 
@@ -200,6 +212,24 @@ export function OrderPanel({ selected }: Props) {
           </label>
         </div>
       </details>
+
+      {stagedSide !== null && ask !== null && bid !== null && (
+        <ConfirmCard
+          side={stagedSide}
+          asset={selected}
+          openPrice={stagedSide === 'buy' ? ask : bid}
+          marginUsd={marginUsd}
+          leverage={leverage}
+          slPrice={slPrice}
+          tpPrice={tpPrice}
+          spreadCostUsd={spreadCostUsd ?? 0}
+          decimals={decimals}
+          displayDec={displayDec}
+          submitting={open.isPending}
+          onConfirm={confirm}
+          onCancel={() => setStagedSide(null)}
+        />
+      )}
     </form>
   );
 }
@@ -213,7 +243,7 @@ function PriceButton({
   disabled,
   onClick,
 }: {
-  side: 'buy' | 'sell';
+  side: Side;
   label: string;
   price: number | null;
   decimals: number;
@@ -259,6 +289,99 @@ function SpreadPill({ costUsd }: { costUsd: number | null }) {
       <span className="mt-1 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-2 py-0.5 font-mono tabular-nums">
         {costUsd === null ? '—' : `$${costUsd.toFixed(2)}`}
       </span>
+    </div>
+  );
+}
+
+function ConfirmCard({
+  side,
+  asset,
+  openPrice,
+  marginUsd,
+  leverage,
+  slPrice,
+  tpPrice,
+  spreadCostUsd,
+  decimals,
+  displayDec,
+  submitting,
+  onConfirm,
+  onCancel,
+}: {
+  side: Side;
+  asset: 'BTC' | 'ETH' | 'SOL';
+  openPrice: number;
+  marginUsd: number;
+  leverage: number;
+  slPrice: number | undefined;
+  tpPrice: number | undefined;
+  spreadCostUsd: number;
+  decimals: number;
+  displayDec: number;
+  submitting: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const isBuy = side === 'buy';
+  const notional = marginUsd * leverage;
+  const liqRaw = isBuy ? openPrice * (1 - 1 / leverage) : openPrice * (1 + 1 / leverage);
+
+  const ctaCls = isBuy
+    ? 'bg-[color:var(--color-accent)] hover:opacity-90'
+    : 'bg-[color:var(--color-down)] hover:opacity-90';
+
+  return (
+    <div className="space-y-3 rounded-md border border-[color:var(--color-border)] p-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-fg-dim)]">
+        Confirm order
+      </h3>
+
+      <button
+        type="button"
+        disabled={submitting}
+        onClick={onConfirm}
+        className={cn(
+          'w-full cursor-pointer rounded-md py-3 text-sm font-semibold text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-50',
+          ctaCls,
+        )}
+      >
+        {submitting
+          ? 'Opening…'
+          : `Confirm ${isBuy ? 'Buy' : 'Sell'} $${marginUsd.toFixed(2)} @ ${fmtPrice(openPrice, decimals, displayDec)}`}
+      </button>
+
+      <button
+        type="button"
+        disabled={submitting}
+        onClick={onCancel}
+        className="w-full cursor-pointer rounded-md border border-[color:var(--color-border)] py-2 text-sm hover:bg-[color:var(--color-bg-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Cancel
+      </button>
+
+      <dl className="space-y-1 rounded-md bg-[color:var(--color-bg-elevated)] p-3 text-xs">
+        <Row label="Asset" value={asset} />
+        <Row label="Side" value={isBuy ? 'Buy / Long' : 'Sell / Short'} />
+        <Row label="Margin" value={`$${marginUsd.toFixed(2)}`} mono />
+        <Row label="Leverage" value={`${leverage}x`} mono />
+        <Row label="Notional" value={`$${notional.toFixed(2)}`} mono />
+        <Row label="Open price" value={fmtPrice(openPrice, decimals, displayDec)} mono />
+        <Row label="Liquidation" value={(liqRaw / 10 ** decimals).toFixed(displayDec)} mono />
+        <Row label="Spread cost" value={`$${spreadCostUsd.toFixed(2)}`} mono />
+        <Row label="Stop loss" value={slPrice !== undefined ? slPrice.toFixed(displayDec) : '—'} mono />
+        <Row label="Take profit" value={tpPrice !== undefined ? tpPrice.toFixed(displayDec) : '—'} mono />
+      </dl>
+    </div>
+  );
+}
+
+function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <dt className="text-[color:var(--color-fg-dim)]">{label}</dt>
+      <dd className={cn('text-[color:var(--color-fg)]', mono && 'font-mono tabular-nums')}>
+        {value}
+      </dd>
     </div>
   );
 }
