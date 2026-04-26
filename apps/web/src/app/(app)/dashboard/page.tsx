@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { AccountFooter } from '@/components/AccountFooter';
 import { AssetSidebar } from '@/components/AssetSidebar';
-import { BalanceBar } from '@/components/BalanceBar';
 import { ChartPanel, type ChartOverlay } from '@/components/ChartPanel';
 import { EditPositionModal } from '@/components/EditPositionModal';
 import { OrderPanel } from '@/components/OrderPanel';
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   }, [openOrders, asset]);
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr]">
+    <div className="grid h-screen grid-rows-[auto_1fr_auto]">
       <header className="flex items-center justify-between border-b border-[color:var(--color-border)] px-6 py-3">
         <span className="text-base font-semibold">Exness</span>
         <div className="flex items-center gap-6">
@@ -75,7 +75,6 @@ export default function DashboardPage() {
           }
         />
         <div className="flex flex-col">
-          <BalanceBar />
           <div className="flex-1 overflow-hidden">
             <ChartPanel
               asset={asset}
@@ -96,6 +95,7 @@ export default function DashboardPage() {
           <OrderPanel selected={asset} />
         </aside>
       </div>
+      <AccountFooter />
 
       {/* Single instance — both the table's Edit button and the chart's
           position marker open the same modal via setEditingOrder. */}
