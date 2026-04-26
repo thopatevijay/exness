@@ -10,6 +10,7 @@ import { useAssets } from '@/hooks/useAssets';
 import { useOpenTrade, type OpenInput } from '@/hooks/useTradeMutations';
 import { ApiResponseError } from '@/lib/api';
 import { fmtPrice } from '@/lib/format';
+import { usePrice } from '@/store/prices';
 import { cn } from '@/lib/utils';
 
 // All numeric inputs are registered with `valueAsNumber: true`, so the schema
@@ -17,7 +18,6 @@ import { cn } from '@/lib/utils';
 // input type `unknown` and fight exactOptionalPropertyTypes).
 const Schema = z.object({
   asset: z.enum(['BTC', 'ETH', 'SOL']),
-  type: z.enum(['buy', 'sell']),
   marginUsd: z.number().positive().min(1),
   leverage: z.union([z.literal(1), z.literal(5), z.literal(10), z.literal(20), z.literal(100)]),
   stopLossPrice: z.number().positive().optional(),
@@ -31,91 +31,97 @@ type Props = { selected: 'BTC' | 'ETH' | 'SOL' };
 
 export function OrderPanel({ selected }: Props) {
   const { data: assetsData } = useAssets();
+  const live = usePrice(selected);
   const open = useOpenTrade();
 
   const { control, register, handleSubmit, setValue, watch } = useForm<Input>({
     resolver: zodResolver(Schema),
-    defaultValues: { asset: selected, type: 'buy', marginUsd: 100, leverage: 10 },
+    defaultValues: { asset: selected, marginUsd: 100, leverage: 10 },
   });
+  const marginUsd = watch('marginUsd') ?? 0;
+  const leverage = watch('leverage');
 
   useEffect(() => {
     setValue('asset', selected);
   }, [selected, setValue]);
 
   const asset = assetsData?.assets.find((a) => a.symbol === selected);
-  const type = watch('type');
-  const marginUsd = watch('marginUsd') ?? 0;
-  const leverage = watch('leverage');
-
-  const exposure = marginUsd * leverage;
-  // Long opens at ASK (the higher quote). Short opens at BID.
-  const openPrice = type === 'buy' ? asset?.ask : asset?.bid;
   // `decimals` = storage scale (used for input parsing + math). `displayDec`
   // = how many digits the user sees (Exness/MT5 convention).
   const decimals = asset?.decimals ?? 4;
   const displayDec = DISPLAY_DECIMALS[selected] ?? decimals;
-  const liqPrice = openPrice
-    ? type === 'buy'
-      ? (openPrice * (1 - 1 / leverage)) / 10 ** decimals
-      : (openPrice * (1 + 1 / leverage)) / 10 ** decimals
-    : null;
 
-  const onSubmit = handleSubmit(async (data) => {
-    try {
-      const payload: OpenInput = {
-        asset: data.asset,
-        type: data.type,
-        margin: Math.round(data.marginUsd * 100), // dollars → cents
-        leverage: data.leverage,
-      };
-      if (data.stopLossPrice !== undefined) {
-        payload.stopLoss = Math.round(data.stopLossPrice * 10 ** decimals);
+  // Prefer the live WS price; fall back to the /assets snapshot only on
+  // first paint before the socket has streamed its first frame.
+  const ask = live?.ask ?? asset?.ask ?? null;
+  const bid = live?.bid ?? asset?.bid ?? null;
+
+  // Spread cost in USD on the user's planned position. This is what real
+  // Exness shows in the spread pill (e.g. "14.00 USD") and is the actual
+  // round-trip cost the user will pay (we don't charge separate fees —
+  // the bid-ask gap IS our fee).
+  //
+  //   notional = marginUsd × leverage      (USD value of the position)
+  //   cost     = notional × (ask − bid) / mid
+  //
+  // With our fixed 1% spread (SPREAD_BPS=100), (ask−bid)/mid ≡ 0.01, so
+  // the cost simplifies to notional × 0.01. We compute from raw ask/bid
+  // anyway so this stays correct if spread becomes variable later.
+  const spreadCostUsd =
+    ask !== null && bid !== null && ask + bid > 0
+      ? (marginUsd * leverage * (ask - bid)) / ((ask + bid) / 2)
+      : null;
+
+  // The side ('buy' / 'sell') is no longer a form field — it comes from
+  // which mega-button the user pressed. submitSide(side) returns a
+  // submit handler bound to that side.
+  const submitSide = (side: 'buy' | 'sell') =>
+    handleSubmit(async (data) => {
+      try {
+        const payload: OpenInput = {
+          asset: data.asset,
+          type: side,
+          margin: Math.round(data.marginUsd * 100), // dollars → cents
+          leverage: data.leverage,
+        };
+        if (data.stopLossPrice !== undefined) {
+          payload.stopLoss = Math.round(data.stopLossPrice * 10 ** decimals);
+        }
+        if (data.takeProfitPrice !== undefined) {
+          payload.takeProfit = Math.round(data.takeProfitPrice * 10 ** decimals);
+        }
+        await open.mutateAsync(payload);
+        toast.success(`Opened ${side.toUpperCase()} ${data.asset} ${data.leverage}x`);
+      } catch (err) {
+        if (err instanceof ApiResponseError) toast.error(err.message);
+        else toast.error('Network error');
       }
-      if (data.takeProfitPrice !== undefined) {
-        payload.takeProfit = Math.round(data.takeProfitPrice * 10 ** decimals);
-      }
-      await open.mutateAsync(payload);
-      toast.success(`Opened ${data.type.toUpperCase()} ${data.asset} ${data.leverage}x`);
-    } catch (err) {
-      if (err instanceof ApiResponseError) toast.error(err.message);
-      else toast.error('Network error');
-    }
-  });
+    });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <Controller
-          control={control}
-          name="type"
-          render={({ field }) => (
-            <>
-              <button
-                type="button"
-                onClick={() => field.onChange('buy')}
-                className={cn(
-                  'rounded-md py-2 text-sm font-medium',
-                  field.value === 'buy'
-                    ? 'bg-[color:var(--color-up)] text-black'
-                    : 'border border-[color:var(--color-border)]',
-                )}
-              >
-                Buy / Long
-              </button>
-              <button
-                type="button"
-                onClick={() => field.onChange('sell')}
-                className={cn(
-                  'rounded-md py-2 text-sm font-medium',
-                  field.value === 'sell'
-                    ? 'bg-[color:var(--color-down)] text-black'
-                    : 'border border-[color:var(--color-border)]',
-                )}
-              >
-                Sell / Short
-              </button>
-            </>
-          )}
+    <form className="space-y-3">
+      {/* Twin price-buttons — sell at BID (left), buy at ASK (right). The
+          live quote IS the button label and re-renders on every WS tick.
+          The thin spread pill in the gutter shows the bid-ask gap. */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+        <PriceButton
+          side="sell"
+          label="Sell"
+          price={bid}
+          decimals={decimals}
+          displayDec={displayDec}
+          disabled={open.isPending}
+          onClick={submitSide('sell')}
+        />
+        <SpreadPill costUsd={spreadCostUsd} />
+        <PriceButton
+          side="buy"
+          label="Buy"
+          price={ask}
+          decimals={decimals}
+          displayDec={displayDec}
+          disabled={open.isPending}
+          onClick={submitSide('buy')}
         />
       </div>
 
@@ -194,37 +200,65 @@ export function OrderPanel({ selected }: Props) {
           </label>
         </div>
       </details>
+    </form>
+  );
+}
 
-      <div className="rounded-md bg-[color:var(--color-bg-elevated)] p-3 text-xs">
-        <div className="flex justify-between">
-          <span className="text-[color:var(--color-fg-dim)]">Exposure</span>
-          <span className="font-mono">${exposure.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[color:var(--color-fg-dim)]">
-            Open price ({type === 'buy' ? 'ask' : 'bid'})
-          </span>
-          <span className="font-mono">
-            {openPrice ? fmtPrice(openPrice, decimals, displayDec) : '—'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[color:var(--color-fg-dim)]">Liquidation</span>
-          <span className="font-mono">{liqPrice ? liqPrice.toFixed(displayDec) : '—'}</span>
-        </div>
-      </div>
-
-      <button
-        type="submit"
-        disabled={open.isPending}
+function PriceButton({
+  side,
+  label,
+  price,
+  decimals,
+  displayDec,
+  disabled,
+  onClick,
+}: {
+  side: 'buy' | 'sell';
+  label: string;
+  price: number | null;
+  decimals: number;
+  displayDec: number;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const isBuy = side === 'buy';
+  return (
+    <button
+      type="button"
+      disabled={disabled || price === null}
+      onClick={onClick}
+      className={cn(
+        'flex cursor-pointer flex-col items-stretch rounded-md py-3 text-left transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50',
+        isBuy
+          ? 'bg-[color:var(--color-accent)]/15 ring-1 ring-[color:var(--color-accent)]'
+          : 'bg-[color:var(--color-down)]/15 ring-1 ring-[color:var(--color-down)]',
+      )}
+    >
+      <span
         className={cn(
-          'w-full rounded-md py-2 text-sm font-medium text-black',
-          type === 'buy' ? 'bg-[color:var(--color-up)]' : 'bg-[color:var(--color-down)]',
-          'disabled:opacity-50',
+          'px-3 text-[10px] font-semibold uppercase tracking-wider',
+          isBuy ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-down)]',
         )}
       >
-        {open.isPending ? 'Opening...' : `Open ${type === 'buy' ? 'Long' : 'Short'}`}
-      </button>
-    </form>
+        {label}
+      </span>
+      <span className="mt-1 px-3 font-mono text-base tabular-nums text-[color:var(--color-fg)]">
+        {price === null ? '—' : fmtPrice(price, decimals, displayDec)}
+      </span>
+    </button>
+  );
+}
+
+// `costUsd` is the round-trip spread cost on the planned position (notional ×
+// spread rate). Updates as the user changes margin/leverage AND as the live
+// quotes tick. Matches what real Exness's "14.00 USD" pill shows.
+function SpreadPill({ costUsd }: { costUsd: number | null }) {
+  return (
+    <div className="flex flex-col items-center justify-center px-1 text-[9px]">
+      <span className="uppercase tracking-wider text-[color:var(--color-fg-dim)]">Spread</span>
+      <span className="mt-1 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-2 py-0.5 font-mono tabular-nums">
+        {costUsd === null ? '—' : `$${costUsd.toFixed(2)}`}
+      </span>
+    </div>
   );
 }
