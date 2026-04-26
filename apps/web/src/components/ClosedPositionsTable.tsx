@@ -2,6 +2,9 @@
 
 import { DISPLAY_DECIMALS } from '@exness/shared';
 import { format } from 'date-fns';
+import { Briefcase } from 'lucide-react';
+import { AssetCell } from './AssetCell';
+import { SideCell } from './OpenPositionsTable';
 import type { ClosedOrder } from '@/hooks/useClosedOrders';
 import { fmtPnl, fmtPrice, pnlClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -30,7 +33,12 @@ export function ClosedPositionsTable({
 }: Props) {
   if (isLoading && trades.length === 0) return <p className="p-2 text-sm">Loading...</p>;
   if (trades.length === 0) {
-    return <p className="p-3 text-sm text-[color:var(--color-fg-dim)]">{emptyLabel}</p>;
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 p-8 text-[color:var(--color-fg-dim)]">
+        <Briefcase className="h-8 w-8 opacity-60" />
+        <p className="text-sm">{emptyLabel}</p>
+      </div>
+    );
   }
 
   return (
@@ -53,8 +61,12 @@ export function ClosedPositionsTable({
           {trades.map((t) => (
             <tr key={t.orderId} className="border-t border-[color:var(--color-border)]">
               <td className="px-2 py-2">{format(new Date(t.closedAt), 'MMM d HH:mm')}</td>
-              <td className="px-2 py-2">{t.asset}</td>
-              <td className="px-2 py-2">{t.type.toUpperCase()}</td>
+              <td className="px-2 py-2">
+                <AssetCell asset={t.asset} />
+              </td>
+              <td className="px-2 py-2">
+                <SideCell side={t.type} />
+              </td>
               <td className="px-2 py-2 text-right font-mono">
                 ${(t.margin / 100).toFixed(2)}
               </td>
