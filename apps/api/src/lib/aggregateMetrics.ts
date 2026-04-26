@@ -82,20 +82,10 @@ export async function refreshAggregatedMetrics(): Promise<void> {
     const dec = ASSET_DECIMALS[sym];
     const latestRaw = await r.get(`latest:${sym}`);
     if (!latestRaw) continue;
-    // Same legacy-tolerant parse as latestPrice.ts: accept ask/bid (new) or
-    // buy/sell (old) so existing Redis keys don't blank out the metric during
-    // rollout.
-    const latest = JSON.parse(latestRaw) as {
-      ask?: string;
-      bid?: string;
-      buy?: string;
-      sell?: string;
-    };
-    const askStr = latest.ask ?? latest.buy;
-    const bidStr = latest.bid ?? latest.sell;
-    if (!askStr || !bidStr) continue;
+    const latest = JSON.parse(latestRaw) as { ask?: string; bid?: string };
+    if (!latest.ask || !latest.bid) continue;
     const exit = {
-      value: o.side === 'buy' ? BigInt(bidStr) : BigInt(askStr),
+      value: o.side === 'buy' ? BigInt(latest.bid) : BigInt(latest.ask),
       decimals: dec,
     };
     const exp = exposure({ value: o.margin, decimals: 2 }, o.leverage as ValidLeverage);

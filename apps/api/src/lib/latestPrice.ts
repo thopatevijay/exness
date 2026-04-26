@@ -13,12 +13,6 @@ export type LatestPrice = { ask: bigint; bid: bigint; decimals: number; ts: numb
  *
  * Throws `PRICE_UNAVAILABLE` only if neither key exists (never-seen asset,
  * cold boot, or both Redis + DB emptied).
- *
- * Accepts both the new `{ ask, bid, ... }` schema and the legacy
- * `{ buy, sell, ... }` schema so existing keys from before the rename don't
- * 503 the API during the rollout window. The legacy branch can be removed
- * once all `latest:*` / `last:*` keys have been refreshed (they expire in
- * 5 min anyway under normal poll cadence).
  */
 export async function getLatestPrice(redis: Redis, asset: Symbol): Promise<LatestPrice> {
   let raw = await redis.get(`latest:${asset}`);
@@ -27,19 +21,15 @@ export async function getLatestPrice(redis: Redis, asset: Symbol): Promise<Lates
   const parsed = JSON.parse(raw) as {
     ask?: string;
     bid?: string;
-    buy?: string;
-    sell?: string;
     decimals?: number;
     ts: number;
   };
-  const askStr = parsed.ask ?? parsed.buy;
-  const bidStr = parsed.bid ?? parsed.sell;
-  if (!askStr || !bidStr) {
+  if (!parsed.ask || !parsed.bid) {
     throw new ApiError(503, 'PRICE_UNAVAILABLE', `corrupt cached price for ${asset}`);
   }
   return {
-    ask: BigInt(askStr),
-    bid: BigInt(bidStr),
+    ask: BigInt(parsed.ask),
+    bid: BigInt(parsed.bid),
     decimals: parsed.decimals ?? ASSET_DECIMALS[asset],
     ts: parsed.ts,
   };
