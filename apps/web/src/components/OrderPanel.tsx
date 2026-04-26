@@ -26,6 +26,10 @@ const Schema = z.object({
 type Input = z.infer<typeof Schema>;
 
 const LEVERAGES = [1, 5, 10, 20, 100] as const;
+// Margin stepper increment. Sized for the default $100 starting margin —
+// 10 clicks moves you across an order of magnitude. Hold for fast input.
+const MARGIN_STEP_USD = 10;
+const MARGIN_MIN_USD = 1;
 
 type Side = 'buy' | 'sell';
 
@@ -137,16 +141,40 @@ export function OrderPanel({ selected }: Props) {
         />
       </div>
 
-      <label className="block">
+      <div>
         <span className="text-xs text-[color:var(--color-fg-dim)]">Margin (USD)</span>
-        <input
-          type="number"
-          step="0.01"
-          min="1"
-          {...register('marginUsd', { valueAsNumber: true })}
-          className="mt-1 block w-full rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-3 py-2 font-mono"
-        />
-      </label>
+        <div className="mt-1 flex items-stretch gap-1">
+          <button
+            type="button"
+            aria-label="Decrease margin"
+            onClick={() =>
+              setValue('marginUsd', Math.max(MARGIN_MIN_USD, marginUsd - MARGIN_STEP_USD), {
+                shouldValidate: true,
+              })
+            }
+            className="w-9 cursor-pointer rounded-md border border-[color:var(--color-border)] font-mono text-base hover:bg-[color:var(--color-bg-elevated)]"
+          >
+            −
+          </button>
+          <input
+            type="number"
+            step="0.01"
+            min={MARGIN_MIN_USD}
+            {...register('marginUsd', { valueAsNumber: true })}
+            className="block w-full rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-3 py-2 text-center font-mono"
+          />
+          <button
+            type="button"
+            aria-label="Increase margin"
+            onClick={() =>
+              setValue('marginUsd', marginUsd + MARGIN_STEP_USD, { shouldValidate: true })
+            }
+            className="w-9 cursor-pointer rounded-md border border-[color:var(--color-border)] font-mono text-base hover:bg-[color:var(--color-bg-elevated)]"
+          >
+            +
+          </button>
+        </div>
+      </div>
 
       <div>
         <span className="text-xs text-[color:var(--color-fg-dim)]">Leverage</span>
@@ -175,43 +203,43 @@ export function OrderPanel({ selected }: Props) {
         />
       </div>
 
-      <details className="rounded-md border border-[color:var(--color-border)] px-3 py-2">
-        <summary className="cursor-pointer text-xs text-[color:var(--color-fg-dim)]">
-          Stop loss / take profit (optional)
-        </summary>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <label className="block">
-            <span className="text-xs text-[color:var(--color-fg-dim)]">SL price</span>
-            <input
-              type="number"
-              step={`0.${'0'.repeat(Math.max(0, decimals - 1))}1`}
-              {...register('stopLossPrice', {
-                setValueAs: (v: string | number) => {
-                  if (v === '' || v === null) return undefined;
-                  const n = +v;
-                  return Number.isNaN(n) ? undefined : n;
-                },
-              })}
-              className="mt-1 block w-full rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-2 py-1 font-mono text-sm"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-[color:var(--color-fg-dim)]">TP price</span>
-            <input
-              type="number"
-              step={`0.${'0'.repeat(Math.max(0, decimals - 1))}1`}
-              {...register('takeProfitPrice', {
-                setValueAs: (v: string | number) => {
-                  if (v === '' || v === null) return undefined;
-                  const n = +v;
-                  return Number.isNaN(n) ? undefined : n;
-                },
-              })}
-              className="mt-1 block w-full rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-2 py-1 font-mono text-sm"
-            />
-          </label>
-        </div>
-      </details>
+      {/* Stop loss / take profit — flat, always visible (no collapse). Empty
+          input shows the "Not set" placeholder; entering a value attaches
+          it to the order at submit. */}
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="text-xs text-[color:var(--color-fg-dim)]">Stop loss</span>
+          <input
+            type="number"
+            step={`0.${'0'.repeat(Math.max(0, decimals - 1))}1`}
+            placeholder="Not set"
+            {...register('stopLossPrice', {
+              setValueAs: (v: string | number) => {
+                if (v === '' || v === null) return undefined;
+                const n = +v;
+                return Number.isNaN(n) ? undefined : n;
+              },
+            })}
+            className="mt-1 block w-full rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-2 py-2 font-mono text-sm placeholder:text-[color:var(--color-fg-dim)]"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs text-[color:var(--color-fg-dim)]">Take profit</span>
+          <input
+            type="number"
+            step={`0.${'0'.repeat(Math.max(0, decimals - 1))}1`}
+            placeholder="Not set"
+            {...register('takeProfitPrice', {
+              setValueAs: (v: string | number) => {
+                if (v === '' || v === null) return undefined;
+                const n = +v;
+                return Number.isNaN(n) ? undefined : n;
+              },
+            })}
+            className="mt-1 block w-full rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-2 py-2 font-mono text-sm placeholder:text-[color:var(--color-fg-dim)]"
+          />
+        </label>
+      </div>
 
       {stagedSide !== null && ask !== null && bid !== null && (
         <ConfirmCard
