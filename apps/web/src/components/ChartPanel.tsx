@@ -4,7 +4,6 @@ import { DISPLAY_DECIMALS } from '@exness/shared';
 import {
   CandlestickSeries,
   ColorType,
-  HistogramSeries,
   createChart,
   type CandlestickData,
   type IChartApi,
@@ -26,8 +25,6 @@ import { TimeframePicker, type TF } from './TimeframePicker';
 // Exness-style colour convention: blue (up) / red (down).
 const UP_COLOR = '#2962ff';
 const DOWN_COLOR = '#ef4444';
-const UP_VOL = 'rgba(41,98,255,0.5)';
-const DOWN_VOL = 'rgba(239,68,68,0.5)';
 
 export type ChartOverlay = {
   price: number;
@@ -47,7 +44,6 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const { data } = useCandles(asset, tf);
   const live = usePrice(asset);
@@ -118,15 +114,6 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
       wickUpColor: UP_COLOR,
       wickDownColor: DOWN_COLOR,
     });
-    const volume = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'volume',
-      lastValueVisible: false,
-      priceLineVisible: false,
-    });
-    chart.priceScale('volume').applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
-    });
 
     // When the user pans / zooms the chart, the y-coordinate corresponding to
     // a fixed price changes. Bump rangeTick so the position-marker overlays
@@ -165,14 +152,12 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
 
     chartRef.current = chart;
     seriesRef.current = series;
-    volumeRef.current = volume;
     return () => {
       ts.unsubscribeVisibleLogicalRangeChange(onRange);
       chart.unsubscribeCrosshairMove(onCrosshair);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      volumeRef.current = null;
       linesRef.current = [];
     };
   }, []);
@@ -188,13 +173,6 @@ export function ChartPanel({ asset, tf, onTfChange, overlays = [], onEditPositio
       close: c.close / 10 ** c.decimal,
     }));
     seriesRef.current.setData(points);
-    volumeRef.current?.setData(
-      candles.map((c) => ({
-        time: c.timestamp as UTCTimestamp,
-        value: c.volume / 1e8,
-        color: c.close >= c.open ? UP_VOL : DOWN_VOL,
-      })),
-    );
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 
