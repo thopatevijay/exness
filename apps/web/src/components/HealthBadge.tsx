@@ -22,7 +22,7 @@ export function HealthBadge({ svc }: { svc: HealthService }) {
         <span className="font-mono text-sm">{LABELS[svc]}</span>
       </div>
       <span className="text-xs text-[color:var(--color-fg-dim)]">
-        {isLoading ? '…' : ok ? `${data?.latencyMs ?? 0}ms` : 'down'}
+        {isLoading ? '…' : ok ? `${data?.latencyMs ?? 0}ms ago` : 'down'}
       </span>
     </div>
   );
