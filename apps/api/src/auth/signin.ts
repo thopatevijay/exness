@@ -1,7 +1,9 @@
 import { env } from '@exness/config';
 import { getDb } from '@exness/db';
+import { logger } from '@exness/logger';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
+import { isBreached } from './breachCheck.js';
 import {
   ACCESS_COOKIE,
   ACCESS_COOKIE_MAX_AGE_MS,
@@ -24,6 +26,16 @@ export async function signin(req: Request, res: Response): Promise<void> {
     res.status(403).json({ message: 'Incorrect credentials' });
     return;
   }
+  // Fire-and-forget telemetry; never blocks signin, fails open inside.
+  void isBreached(password).then((b) => {
+    if (b.breached) {
+      logger.warn(
+        { userId: user.id, breachCount: b.count },
+        'signed in with known-breached password',
+      );
+    }
+  });
+
   const access = signAccessToken(user.id);
   const refresh = signRefreshToken(user.id);
   const secure = env.NODE_ENV === 'production';
