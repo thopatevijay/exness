@@ -1,6 +1,6 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/liquidation-worker build"
+buildCommand = "pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@exness/liquidation-worker"
 watchPatterns = ["apps/liquidation-worker/**", "packages/**", "pnpm-lock.yaml", "package.json"]
 
 [deploy]

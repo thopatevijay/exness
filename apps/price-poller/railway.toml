@@ -1,6 +1,6 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/price-poller build"
+buildCommand = "pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@exness/price-poller"
 watchPatterns = ["apps/price-poller/**", "packages/**", "pnpm-lock.yaml", "package.json"]
 
 [deploy]

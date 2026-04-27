@@ -1,6 +1,6 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/api build"
+buildCommand = "pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@exness/api"
 watchPatterns = ["apps/api/**", "packages/**", "pnpm-lock.yaml", "package.json"]
 
 [deploy]

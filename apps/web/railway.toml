@@ -1,6 +1,6 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/web build"
+buildCommand = "pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@exness/web"
 watchPatterns = ["apps/web/**", "packages/**", "pnpm-lock.yaml", "package.json"]
 
 [deploy]

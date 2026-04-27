@@ -1,6 +1,6 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/batch-uploader build"
+buildCommand = "pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@exness/batch-uploader"
 watchPatterns = ["apps/batch-uploader/**", "packages/**", "pnpm-lock.yaml", "package.json"]
 
 [deploy]
