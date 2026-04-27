@@ -17,7 +17,19 @@ export function buildServer(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
-  app.use(cors({ origin: true, credentials: true }));
+
+  const ALLOWED = env.ALLOWED_ORIGINS.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        if (!origin || ALLOWED.includes(origin)) return cb(null, true);
+        cb(null, false);
+      },
+      credentials: true,
+    }),
+  );
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
   app.use(requestId);

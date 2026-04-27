@@ -11,6 +11,8 @@ export const env = cleanEnv(process.env, {
   JWT_SECRET: str({ desc: '32-byte hex; openssl rand -hex 32' }),
   JWT_EXPIRY: str({ default: '24h' }),
 
+  ALLOWED_ORIGINS: str({ default: '' }),
+
   BINANCE_WS_URL: url({ default: 'wss://stream.binance.com:9443/stream' }),
   BINANCE_SYMBOLS: str({ default: 'btcusdt,ethusdt,solusdt' }),
 
