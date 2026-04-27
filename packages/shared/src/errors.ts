@@ -1,6 +1,7 @@
 export const ERROR_CODES = [
   'INVALID_INPUT',
   'AUTH_REQUIRED',
+  'FORBIDDEN',
   'BAD_CREDENTIALS',
   'USER_EXISTS',
   'ASSET_NOT_FOUND',
@@ -9,6 +10,7 @@ export const ERROR_CODES = [
   'ORDER_NOT_FOUND',
   'ORDER_ALREADY_CLOSED',
   'PRICE_UNAVAILABLE',
+  'IN_FLIGHT',
   'INTERNAL_ERROR',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

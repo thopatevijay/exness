@@ -8,6 +8,7 @@ import {
 } from '@exness/shared';
 import { signin } from '../auth/signin.js';
 import { signup } from '../auth/signup.js';
+import { requireAdmin } from '../middleware/admin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
 import { ipRateLimit, userRateLimit } from '../middleware/rateLimit.js';
@@ -74,6 +75,6 @@ router.post('/trade/:id/close', requireAuth, closeLimit, closeTrade);
 router.get('/trades/open', requireAuth, getOpenTrades);
 router.get('/trades', requireAuth, getClosedTrades);
 
-// Admin (unauthenticated for V0 demo; B2 of the security plan will gate this
-// behind requireAuth + an isAdmin flag).
-router.get('/admin/platform', getPlatformSummary);
+// Admin — gated by users.is_admin. Promote a user with:
+//   UPDATE users SET is_admin = true WHERE email = 'you@example.com';
+router.get('/admin/platform', requireAuth, requireAdmin, getPlatformSummary);

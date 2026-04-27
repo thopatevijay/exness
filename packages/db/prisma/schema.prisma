@@ -13,6 +13,7 @@ model User {
   id           String         @id @default(uuid()) @db.Uuid
   email        String         @unique @db.Citext
   passwordHash String         @map("password_hash")
+  isAdmin      Boolean        @default(false) @map("is_admin")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
   balance      Balance?
   orders       Order[]

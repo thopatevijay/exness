@@ -10,8 +10,12 @@ CREATE TABLE IF NOT EXISTS users (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email         citext UNIQUE NOT NULL,
   password_hash text NOT NULL,
+  is_admin      boolean NOT NULL DEFAULT false,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+-- Partial index — admin rows are rare. Used by the requireAdmin middleware
+-- to gate /admin/* routes.
+CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin) WHERE is_admin = true;
 
 -- ===========================================================================
 -- ASSETS
