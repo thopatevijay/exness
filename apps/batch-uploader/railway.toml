@@ -1,0 +1,9 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/batch-uploader build"
+watchPatterns = ["apps/batch-uploader/**", "packages/**", "pnpm-lock.yaml", "package.json"]
+
+[deploy]
+startCommand = "pnpm --filter @exness/batch-uploader start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

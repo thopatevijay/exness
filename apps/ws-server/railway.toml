@@ -1,0 +1,9 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/ws-server build"
+watchPatterns = ["apps/ws-server/**", "packages/**", "pnpm-lock.yaml", "package.json"]
+
+[deploy]
+startCommand = "pnpm --filter @exness/ws-server start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

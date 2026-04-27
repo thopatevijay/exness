@@ -1,0 +1,9 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @exness/liquidation-worker build"
+watchPatterns = ["apps/liquidation-worker/**", "packages/**", "pnpm-lock.yaml", "package.json"]
+
+[deploy]
+startCommand = "pnpm --filter @exness/liquidation-worker start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
