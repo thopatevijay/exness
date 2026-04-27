@@ -7,15 +7,15 @@ import { signAccessToken, signRefreshToken } from './jwt.js';
 const ACCESS_COOKIE_MAX_AGE_MS = 15 * 60 * 1000;
 const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Equalizes signin time when no user matches; prevents email enumeration via timing.
+const DUMMY_HASH = bcrypt.hashSync('dummy', 12);
+
 export async function signin(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body as { email: string; password: string };
   const user = await getDb().user.findUnique({ where: { email } });
-  if (!user) {
-    res.status(403).json({ message: 'Incorrect credentials' });
-    return;
-  }
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) {
+  const hash = user?.passwordHash ?? DUMMY_HASH;
+  const ok = await bcrypt.compare(password, hash);
+  if (!user || !ok) {
     res.status(403).json({ message: 'Incorrect credentials' });
     return;
   }
