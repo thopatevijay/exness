@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const redisPubSub = createRedis();
   const redisStreams = createRedis();
 
-  const reg = startWsServer();
+  const reg = startWsServer(redisStreams);
   startPricesFanout(redisPubSub, reg);
   startHealth(redisStreams, reg);
   initMetrics(redisStreams, reg);

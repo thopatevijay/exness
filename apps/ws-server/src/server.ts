@@ -3,15 +3,15 @@ import { logger } from '@exness/logger';
 import { SYMBOLS, type Symbol } from '@exness/shared';
 import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage } from 'node:http';
+import type { Redis } from 'ioredis';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
-import { verifyTokenFromQuery } from './auth.js';
+import { consumeTicket } from './auth.js';
 import { SubscriptionRegistry } from './subscriptions.js';
 
 const HEARTBEAT_MS = 30_000;
-
 const GUEST_PREFIX = 'guest:';
 
-export function startWsServer(): SubscriptionRegistry {
+export function startWsServer(redis: Redis): SubscriptionRegistry {
   const reg = new SubscriptionRegistry();
 
   const httpServer = createServer((_req, res) => {
@@ -21,17 +21,18 @@ export function startWsServer(): SubscriptionRegistry {
   const wss = new WebSocketServer({ noServer: true });
 
   httpServer.on('upgrade', (req: IncomingMessage, socket, head) => {
-    // Guests (no/invalid token) get a synthetic id and connect read-only.
-    // Authenticated users get their real sub from the JWT.
-    let userId: string;
-    try {
-      userId = verifyTokenFromQuery(req.url);
-    } catch {
-      userId = `${GUEST_PREFIX}${randomUUID()}`;
-    }
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      onConnect(ws, userId, reg);
-    });
+    void (async () => {
+      let userId: string;
+      try {
+        const sub = await consumeTicket(req.url, redis);
+        userId = sub ?? `${GUEST_PREFIX}${randomUUID()}`;
+      } catch {
+        userId = `${GUEST_PREFIX}${randomUUID()}`;
+      }
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        onConnect(ws, userId, reg);
+      });
+    })();
   });
 
   httpServer.listen(env.WS_SERVER_PORT, () => {

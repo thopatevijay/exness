@@ -1,6 +1,7 @@
 import { env } from '@exness/config';
 import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import {
   signAccessToken,
   signRefreshToken,
@@ -9,6 +10,8 @@ import {
 } from '../auth/jwt.js';
 import { redis } from '../lib/redis.js';
 import { ApiError } from '../middleware/error.js';
+
+const WS_TICKET_TTL_SEC = 5;
 
 const ACCESS_COOKIE_MAX_AGE_MS = 15 * 60 * 1000;
 const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -106,4 +109,12 @@ export async function logout(req: Request, res: Response): Promise<void> {
   res.clearCookie('token', { path: '/' });
   res.clearCookie('refresh-token', { path: '/api/v1/auth/refresh' });
   res.status(200).json({ ok: true });
+}
+
+export async function wsTicket(req: Request, res: Response): Promise<void> {
+  const userId = req.userId;
+  if (!userId) throw new ApiError(401, 'AUTH_REQUIRED', 'No user');
+  const ticket = randomUUID();
+  await redis().set(`ws-ticket:${ticket}`, userId, 'EX', WS_TICKET_TTL_SEC);
+  res.status(200).json({ ticket });
 }

@@ -60,20 +60,19 @@ export function useExnessSocket(): void {
     };
 
     const connect = async (): Promise<void> => {
-      if (myGen !== generationRef.current) return; // a newer effect run owns the socket
-      let token: string | null = null;
+      if (myGen !== generationRef.current) return;
+      let ticket: string | null = null;
       try {
-        const r = await fetch('/api/auth/token');
+        const r = await fetch('/api/ws/ticket', { method: 'POST' });
         if (r.ok) {
-          const body = (await r.json()) as { token: string | null };
-          token = body.token;
+          const body = (await r.json()) as { ticket?: string };
+          ticket = body.ticket ?? null;
         }
       } catch {
       }
-      if (myGen !== generationRef.current) return; // bailed during async fetch
+      if (myGen !== generationRef.current) return;
 
-
-      const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
+      const url = ticket ? `${WS_URL}?ticket=${encodeURIComponent(ticket)}` : WS_URL;
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
