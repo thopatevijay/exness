@@ -34,8 +34,9 @@ export async function closeOrder(
   const db = getDb();
   const wonRace = await db.$transaction(async (tx) => {
     const deleted = await tx.$queryRawUnsafe<{ id: string }[]>(
-      `DELETE FROM orders WHERE id = $1::uuid RETURNING id`,
+      `DELETE FROM orders WHERE id = $1::uuid AND user_id = $2::uuid RETURNING id`,
       order.orderId,
+      order.userId,
     );
     if (deleted.length === 0) return false; // someone else won the close race
     await tx.$executeRawUnsafe(

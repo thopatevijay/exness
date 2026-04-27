@@ -3,6 +3,7 @@ import { ASSET_DECIMALS, type ModifyTradeInput, type Symbol } from '@exness/shar
 import type { Side } from '@exness/money';
 import type { Request, Response } from 'express';
 import { emitOrderModified } from '../lib/events.js';
+import { getLatestPrice } from '../lib/latestPrice.js';
 import { redis } from '../lib/redis.js';
 import { ApiError } from '../middleware/error.js';
 
@@ -20,23 +21,45 @@ export async function modifyTrade(req: Request, res: Response): Promise<void> {
 
   const side = order.side as Side;
   const openPrice = order.openPrice;
+  const asset = order.asset as Symbol;
+  const live = await getLatestPrice(redis(), asset);
 
   if (input.stopLoss !== undefined && input.stopLoss !== null) {
     const sl = BigInt(input.stopLoss);
-    if (side === 'buy' && sl >= openPrice) {
-      throw new ApiError(400, 'INVALID_INPUT', 'stopLoss must be below open price for long');
+    if (side === 'buy') {
+      if (sl >= openPrice) {
+        throw new ApiError(400, 'INVALID_INPUT', 'stopLoss must be below open price for long');
+      }
+      if (sl >= live.bid) {
+        throw new ApiError(400, 'INVALID_INPUT', 'stopLoss would trigger immediately at current bid');
+      }
     }
-    if (side === 'sell' && sl <= openPrice) {
-      throw new ApiError(400, 'INVALID_INPUT', 'stopLoss must be above open price for short');
+    if (side === 'sell') {
+      if (sl <= openPrice) {
+        throw new ApiError(400, 'INVALID_INPUT', 'stopLoss must be above open price for short');
+      }
+      if (sl <= live.ask) {
+        throw new ApiError(400, 'INVALID_INPUT', 'stopLoss would trigger immediately at current ask');
+      }
     }
   }
   if (input.takeProfit !== undefined && input.takeProfit !== null) {
     const tp = BigInt(input.takeProfit);
-    if (side === 'buy' && tp <= openPrice) {
-      throw new ApiError(400, 'INVALID_INPUT', 'takeProfit must be above open price for long');
+    if (side === 'buy') {
+      if (tp <= openPrice) {
+        throw new ApiError(400, 'INVALID_INPUT', 'takeProfit must be above open price for long');
+      }
+      if (tp <= live.bid) {
+        throw new ApiError(400, 'INVALID_INPUT', 'takeProfit would trigger immediately at current bid');
+      }
     }
-    if (side === 'sell' && tp >= openPrice) {
-      throw new ApiError(400, 'INVALID_INPUT', 'takeProfit must be below open price for short');
+    if (side === 'sell') {
+      if (tp >= openPrice) {
+        throw new ApiError(400, 'INVALID_INPUT', 'takeProfit must be below open price for short');
+      }
+      if (tp >= live.ask) {
+        throw new ApiError(400, 'INVALID_INPUT', 'takeProfit would trigger immediately at current ask');
+      }
     }
   }
 
