@@ -9,7 +9,7 @@ set -u
 
 echo "▶︎ killing node dev servers (apps/*, next dev, tsx watch, turbo)..."
 PATTERNS=(
-  "apps/(price-poller|batch-uploader|api|ws-server|liquidation-worker|web)/"
+  "apps/(price-poller|batch-uploader|api|ws-server|liquidation-worker|notifier|web)/"
   "next dev"
   "tsx watch"
   "turbo run dev"
@@ -33,7 +33,7 @@ if [ -n "$all_pids" ]; then
 fi
 
 # Also kill anything still holding our known ports (catches stragglers)
-for port in 8000 8001 9001 9002 9003 9004 9005 3001; do
+for port in 8000 8001 9001 9002 9003 9004 9005 9006 3001; do
   port_pids=$(lsof -tiTCP:$port -sTCP:LISTEN 2>/dev/null || true)
   for pid in $port_pids; do
     if [ -n "$pid" ] && [ "$pid" != "$self" ]; then

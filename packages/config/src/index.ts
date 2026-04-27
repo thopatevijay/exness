@@ -24,6 +24,11 @@ export const env = cleanEnv(process.env, {
   PRICE_POLLER_HEALTH_PORT: port({ default: 9002 }),
   BATCH_UPLOADER_HEALTH_PORT: port({ default: 9003 }),
   LIQUIDATION_WORKER_HEALTH_PORT: port({ default: 9004 }),
+  NOTIFIER_HEALTH_PORT: port({ default: 9006 }),
+
+  RESEND_API_KEY: str({ default: '' }),
+  EMAIL_FROM: str({ default: 'Exness Demo <onboarding@resend.dev>' }),
+  EMAIL_DRY_RUN: str({ choices: ['true', 'false'], default: 'true' }),
 });
 
 export type Env = typeof env;

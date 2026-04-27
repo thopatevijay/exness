@@ -3,6 +3,7 @@ import type { Side } from '@exness/money';
 import type { Redis } from 'ioredis';
 
 const STREAM = 'trade_executed';
+const USER_STREAM = 'user_events';
 
 export async function emitOrderOpened(
   redis: Redis,
@@ -71,6 +72,52 @@ export async function emitOrderClosed(
     'closeReason', args.closeReason,
     'requestId', args.requestId,
     'ts', String(ts),
+  );
+}
+
+export async function emitUserDeposit(
+  redis: Redis,
+  args: {
+    userId: string;
+    amount: bigint;
+    newBalance: bigint;
+    requestId: string;
+  },
+): Promise<void> {
+  await redis.xadd(
+    USER_STREAM,
+    'MAXLEN', '~', '5000',
+    '*',
+    'type', 'user_deposit',
+    'userId', args.userId,
+    'amount', args.amount.toString(),
+    'newBalance', args.newBalance.toString(),
+    'requestId', args.requestId,
+    'ts', String(Date.now()),
+  );
+}
+
+export async function emitUserReset(
+  redis: Redis,
+  args: {
+    userId: string;
+    newBalance: bigint;
+    ordersClosed: number;
+    historyDeleted: number;
+    requestId: string;
+  },
+): Promise<void> {
+  await redis.xadd(
+    USER_STREAM,
+    'MAXLEN', '~', '5000',
+    '*',
+    'type', 'user_reset',
+    'userId', args.userId,
+    'newBalance', args.newBalance.toString(),
+    'ordersClosed', String(args.ordersClosed),
+    'historyDeleted', String(args.historyDeleted),
+    'requestId', args.requestId,
+    'ts', String(Date.now()),
   );
 }
 

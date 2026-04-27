@@ -1,0 +1,9 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@exness/notifier"
+watchPatterns = ["apps/notifier/**", "packages/**", "pnpm-lock.yaml", "package.json"]
+
+[deploy]
+startCommand = "pnpm --filter @exness/notifier start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
