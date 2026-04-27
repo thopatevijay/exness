@@ -36,7 +36,7 @@ export function PositionsTabs({ onEditPosition }: Props) {
         {tab === 'closed' && (
           <div className="ml-auto flex items-center pr-3">
             <Link
-              href="/dashboard/history"
+              href="/webtrading/history"
               className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
             >
               Full history →

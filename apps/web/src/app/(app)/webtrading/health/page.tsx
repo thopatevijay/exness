@@ -10,10 +10,10 @@ export default function OpsPage() {
       <header className="mb-6 flex w-full max-w-md items-center justify-between">
         <h1 className="text-2xl font-semibold">Health</h1>
         <Link
-          href="/dashboard"
+          href="/webtrading"
           className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
         >
-          ← Dashboard
+          ← Web trading
         </Link>
       </header>
 

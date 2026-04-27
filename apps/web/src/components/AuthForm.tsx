@@ -58,7 +58,7 @@ export function AuthForm({ mode }: Props) {
         toast.error(body.message ?? body.error?.message ?? 'Signin failed');
         return;
       }
-      router.push('/dashboard');
+      router.push('/webtrading');
     } catch {
       toast.error('Network error');
     }

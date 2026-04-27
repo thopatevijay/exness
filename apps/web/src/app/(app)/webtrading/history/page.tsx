@@ -46,10 +46,10 @@ export default function HistoryPage() {
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            href="/dashboard"
+            href="/webtrading"
             className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
           >
-            ← Dashboard
+            ← Web trading
           </Link>
           <h1 className="text-2xl font-semibold">History</h1>
         </div>

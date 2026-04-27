@@ -1,8 +1,12 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { SocketMount } from '@/components/SocketMount';
 import { TickerStrip } from '@/components/TickerStrip';
+import { getSession } from '@/lib/session';
 
-export default function Landing() {
+export default async function Landing() {
+  const session = await getSession();
+  if (session) redirect('/webtrading');
   return (
     <main className="mx-auto max-w-3xl px-6 py-20">
       <SocketMount />

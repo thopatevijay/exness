@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { DISPLAY_DECIMALS } from '@exness/shared';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { AccountFooter } from '@/components/AccountFooter';
 import { AssetSidebar } from '@/components/AssetSidebar';
@@ -13,21 +14,31 @@ import { SettingsPopover } from '@/components/SettingsPopover';
 import type { TF } from '@/components/TimeframePicker';
 import type { AssetView } from '@/hooks/useAssets';
 import { useOpenOrders, type OpenOrder } from '@/hooks/useOpenOrders';
+import { fmtPrice } from '@/lib/format';
+import { usePrice } from '@/store/prices';
 
 const SIDEBAR_MIN = 300;
 const SIDEBAR_MAX = 600;
 const SIDEBAR_DEFAULT = 400;
 
-export default function DashboardPage() {
+export default function WebTradingPage() {
   const [asset, setAsset] = useState<AssetView['symbol']>('BTC');
   const [tf, setTf] = useState<TF>('1m');
   const [sidebarW, setSidebarW] = useState(SIDEBAR_DEFAULT);
   const [editingOrder, setEditingOrder] = useState<OpenOrder | null>(null);
   const { data: openOrders } = useOpenOrders();
+  const live = usePrice(asset);
 
-  // Static dashed price-lines on the chart for Liq / SL / TP. The Entry line
-  // is replaced by the in-chart position marker (rendered inside ChartPanel),
-  // so it doesn't appear in this list.
+  useEffect(() => {
+    if (!live) {
+      document.title = `${asset} | Exness`;
+      return;
+    }
+    const dec = live.decimals;
+    const display = DISPLAY_DECIMALS[asset] ?? dec;
+    document.title = `${asset} Bid ${fmtPrice(live.bid, dec, display)} | Exness`;
+  }, [asset, live]);
+
   const overlays: ChartOverlay[] = useMemo(() => {
     const trades = openOrders?.trades.filter((t) => t.asset === asset) ?? [];
     const out: ChartOverlay[] = [];
@@ -56,7 +67,7 @@ export default function DashboardPage() {
         </span>
         <div className="flex items-center gap-6">
           <Link
-            href="/dashboard/ops"
+            href="/webtrading/health"
             className="text-xs text-[color:var(--color-fg-dim)] underline hover:opacity-80"
           >
             Health
