@@ -41,3 +41,8 @@ export const CandlesQuerySchema = z.object({
   endTime: z.coerce.number().int().nonnegative(),
   ts: z.enum(['1m', '5m', '15m', '1h', '1d', '1w']),
 });
+
+export const ResetDemoSchema = z.object({
+  confirm: z.literal('WIPE-MY-ACCOUNT'),
+});
+export type ResetDemoInput = z.infer<typeof ResetDemoSchema>;

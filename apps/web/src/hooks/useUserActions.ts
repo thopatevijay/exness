@@ -50,6 +50,8 @@ export function useResetDemo() {
     mutationFn: () =>
       api<{ ok: true; usd_balance: number; removedOrders: number }>('/api/v1/user/reset-demo', {
         method: 'POST',
+        body: JSON.stringify({ confirm: 'WIPE-MY-ACCOUNT' }),
+        headers: { 'content-type': 'application/json' },
       }),
     onSuccess: () => invalidateAll(qc),
   });
