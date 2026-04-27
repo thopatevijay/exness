@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { SYMBOLS, type Symbol } from '@exness/shared';
 import { WS_URL } from '@/lib/env';
 import { wasLocal } from '@/lib/requestIdMemory';
-import { usePricesStore } from '@/store/prices';
+import { usePricesStore, type LivePrice } from '@/store/prices';
 
 type WsMessage =
   | {
@@ -35,19 +35,32 @@ export function useExnessSocket(): void {
   const qc = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(1_000);
-  const closedRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const generationRef = useRef(0);
 
   useEffect(() => {
-    closedRef.current = false;
-    // Pull store actions imperatively. Subscribing via selectors and listing
-    // the resulting fns in this effect's dep array is fragile (any perceived
-    // ref-instability causes the effect to tear down + reopen the WS, which
-    // in dev with React StrictMode + HMR can degenerate into a render storm).
-    // The actions are stable for the life of the store, so getState() is
-    // both correct and simpler.
+    generationRef.current += 1;
+    const myGen = generationRef.current;
+
     const { setPrices, reset } = usePricesStore.getState();
 
+    const pending = new Map<Symbol, LivePrice>();
+    let rafId: number | null = null;
+    const queueUpdates = (updates: Array<[Symbol, LivePrice]>): void => {
+      for (const [s, p] of updates) pending.set(s, p);
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (pending.size === 0) return;
+        const drained = Array.from(pending.entries());
+        pending.clear();
+        setPrices(drained);
+      });
+    };
+
     const connect = async (): Promise<void> => {
+      if (myGen !== generationRef.current) return; // a newer effect run owns the socket
       let token: string | null = null;
       try {
         const r = await fetch('/api/auth/token');
@@ -59,6 +72,7 @@ export function useExnessSocket(): void {
         // ignore — fall through to the "no token" branch below
       }
       if (!token) return; // not signed in
+      if (myGen !== generationRef.current) return; // bailed during async fetch
 
       const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
       wsRef.current = ws;
@@ -79,9 +93,7 @@ export function useExnessSocket(): void {
 
           if (msg.type === 'price_updates') {
             const now = Date.now();
-            // Single store write per WS frame — collapses N symbol updates
-            // into one Map allocation + one re-render burst.
-            setPrices(
+            queueUpdates(
               msg.price_updates.map((u) => [
                 u.symbol,
                 { ask: u.ask, bid: u.bid, decimals: u.decimals, ts: now },
@@ -122,11 +134,15 @@ export function useExnessSocket(): void {
       });
 
       ws.addEventListener('close', () => {
+        if (myGen !== generationRef.current) return;
         wsRef.current = null;
-        if (closedRef.current) return;
         const delay = backoffRef.current;
         backoffRef.current = Math.min(backoffRef.current * 2, 30_000);
-        setTimeout(() => void connect(), delay);
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null;
+          if (myGen !== generationRef.current) return;
+          void connect();
+        }, delay);
       });
 
       ws.addEventListener('error', () => {
@@ -138,8 +154,16 @@ export function useExnessSocket(): void {
     void connect();
 
     return () => {
-      closedRef.current = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       wsRef.current?.close();
+      wsRef.current = null;
       reset();
     };
   }, [qc]);
