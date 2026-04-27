@@ -15,7 +15,8 @@ export async function startOrderFanout(redis: Redis, reg: SubscriptionRegistry):
     for (const e of entries) {
       const userId = e.data['userId'];
       const type = e.data['type'];
-      if (!userId) {
+
+      if (!userId || userId.startsWith('guest:')) {
         await redis.xack(STREAM, GROUP, e.id);
         continue;
       }

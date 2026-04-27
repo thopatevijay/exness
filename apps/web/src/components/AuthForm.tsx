@@ -1,10 +1,12 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+
+const SAFE_NEXT = new Set(['/webtrading', '/webtrading/health', '/webtrading/history']);
 
 const Schema = z.object({
   email: z.email(),
@@ -18,6 +20,9 @@ type Props = {
 
 export function AuthForm({ mode }: Props) {
   const router = useRouter();
+  const params = useSearchParams();
+  const nextParam = params.get('next');
+  const next = nextParam && SAFE_NEXT.has(nextParam) ? nextParam : '/webtrading';
   const {
     register,
     handleSubmit,
@@ -58,7 +63,7 @@ export function AuthForm({ mode }: Props) {
         toast.error(body.message ?? body.error?.message ?? 'Signin failed');
         return;
       }
-      router.push('/webtrading');
+      router.push(next);
     } catch {
       toast.error('Network error');
     }

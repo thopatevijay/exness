@@ -20,10 +20,12 @@ import { resetDemo } from './userReset.js';
 
 export const router: ExpressRouter = Router();
 
-// Public
+// Public — market data endpoints have no per-user component, so they're
+// open to guests powering the showroom-mode trading view.
 router.post('/user/signup', validateBody(SignupSchema), signup);
 router.post('/user/signin', validateBody(SigninSchema), signin);
 router.get('/assets', getAssets);
+router.get('/candles', getCandles);
 
 // Protected
 router.get('/user/me', requireAuth, getMe);
@@ -35,7 +37,6 @@ router.post('/trade/:id/modify', requireAuth, validateBody(ModifyTradeSchema), m
 router.post('/trade/:id/close', requireAuth, closeTrade);
 router.get('/trades/open', requireAuth, getOpenTrades);
 router.get('/trades', requireAuth, getClosedTrades);
-router.get('/candles', requireAuth, getCandles);
 
 // Admin (unauthenticated for V0 demo; V1 will add isAdmin flag + middleware)
 router.get('/admin/platform', getPlatformSummary);

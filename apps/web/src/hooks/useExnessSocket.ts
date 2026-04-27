@@ -69,12 +69,12 @@ export function useExnessSocket(): void {
           token = body.token;
         }
       } catch {
-        // ignore — fall through to the "no token" branch below
       }
-      if (!token) return; // not signed in
       if (myGen !== generationRef.current) return; // bailed during async fetch
 
-      const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
+
+      const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
+      const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.addEventListener('open', () => {

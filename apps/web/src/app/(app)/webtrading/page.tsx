@@ -7,10 +7,12 @@ import { AccountFooter } from '@/components/AccountFooter';
 import { AssetSidebar } from '@/components/AssetSidebar';
 import { ChartPanel, type ChartOverlay } from '@/components/ChartPanel';
 import { EditPositionModal } from '@/components/EditPositionModal';
+import { GuestAuthCTAs } from '@/components/GuestAuthCTAs';
 import { OrderPanel } from '@/components/OrderPanel';
 import { PositionsTabs } from '@/components/PositionsTabs';
 import { ResizeHandle } from '@/components/ResizeHandle';
 import { SettingsPopover } from '@/components/SettingsPopover';
+import { useSession } from '@/components/SessionProvider';
 import type { TF } from '@/components/TimeframePicker';
 import type { AssetView } from '@/hooks/useAssets';
 import { useOpenOrders, type OpenOrder } from '@/hooks/useOpenOrders';
@@ -28,6 +30,8 @@ export default function WebTradingPage() {
   const [editingOrder, setEditingOrder] = useState<OpenOrder | null>(null);
   const { data: openOrders } = useOpenOrders();
   const live = usePrice(asset);
+  const session = useSession();
+  const authed = session.authed;
 
   useEffect(() => {
     if (!live) {
@@ -72,7 +76,7 @@ export default function WebTradingPage() {
           >
             Health
           </Link>
-          <SettingsPopover />
+          {authed ? <SettingsPopover /> : <GuestAuthCTAs />}
         </div>
       </header>
       <div
@@ -106,7 +110,7 @@ export default function WebTradingPage() {
           <OrderPanel selected={asset} />
         </aside>
       </div>
-      <AccountFooter />
+      {authed && <AccountFooter />}
 
       {/* Single instance — both the table's Edit button and the chart's
           position marker open the same modal via setEditingOrder. */}

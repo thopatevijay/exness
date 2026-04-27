@@ -1,12 +1,15 @@
 import { env } from '@exness/config';
 import { logger } from '@exness/logger';
 import { SYMBOLS, type Symbol } from '@exness/shared';
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage } from 'node:http';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { verifyTokenFromQuery } from './auth.js';
 import { SubscriptionRegistry } from './subscriptions.js';
 
 const HEARTBEAT_MS = 30_000;
+
+const GUEST_PREFIX = 'guest:';
 
 export function startWsServer(): SubscriptionRegistry {
   const reg = new SubscriptionRegistry();
@@ -18,13 +21,13 @@ export function startWsServer(): SubscriptionRegistry {
   const wss = new WebSocketServer({ noServer: true });
 
   httpServer.on('upgrade', (req: IncomingMessage, socket, head) => {
+    // Guests (no/invalid token) get a synthetic id and connect read-only.
+    // Authenticated users get their real sub from the JWT.
     let userId: string;
     try {
       userId = verifyTokenFromQuery(req.url);
     } catch {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
+      userId = `${GUEST_PREFIX}${randomUUID()}`;
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
       onConnect(ws, userId, reg);

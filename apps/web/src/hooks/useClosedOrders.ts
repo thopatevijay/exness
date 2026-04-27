@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useSession } from '@/components/SessionProvider';
 
 export type ClosedOrder = {
   orderId: string;
@@ -19,6 +20,7 @@ export type ClosedOrder = {
 };
 
 export function useClosedOrders() {
+  const session = useSession();
   return useInfiniteQuery({
     queryKey: ['closed-orders'],
     initialPageParam: null as string | null,
@@ -27,5 +29,6 @@ export function useClosedOrders() {
         `/api/v1/trades?limit=50${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
       ),
     getNextPageParam: (last) => last.nextCursor,
+    enabled: session.authed,
   });
 }

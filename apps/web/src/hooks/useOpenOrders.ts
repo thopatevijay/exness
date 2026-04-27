@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useSession } from '@/components/SessionProvider';
 
 export type OpenOrder = {
   orderId: string;
@@ -19,9 +20,11 @@ export type OpenOrder = {
 };
 
 export function useOpenOrders() {
+  const session = useSession();
   return useQuery({
     queryKey: ['open-orders'],
     queryFn: () => api<{ trades: OpenOrder[] }>('/api/v1/trades/open'),
     refetchInterval: 5_000,
+    enabled: session.authed,
   });
 }

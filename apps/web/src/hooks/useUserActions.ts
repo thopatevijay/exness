@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useSession } from '@/components/SessionProvider';
 
 export type Me = {
   email: string;
@@ -12,11 +13,13 @@ export type Me = {
 };
 
 export function useMe(): UseQueryResult<Me> {
+  const session = useSession();
   return useQuery({
     queryKey: ['me'],
     queryFn: () => api<Me>('/api/v1/user/me'),
     staleTime: 30_000,
     refetchInterval: 60_000,
+    enabled: session.authed,
   });
 }
 

@@ -4,6 +4,7 @@ import { DISPLAY_DECIMALS } from '@exness/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useAssets } from '@/hooks/useAssets';
@@ -11,6 +12,7 @@ import { useOpenTrade, type OpenInput } from '@/hooks/useTradeMutations';
 import { ApiResponseError } from '@/lib/api';
 import { fmtPrice } from '@/lib/format';
 import { usePrice } from '@/store/prices';
+import { useSession } from '@/components/SessionProvider';
 import { cn } from '@/lib/utils';
 
 // All numeric inputs are registered with `valueAsNumber: true`, so the schema
@@ -39,6 +41,9 @@ export function OrderPanel({ selected }: Props) {
   const { data: assetsData } = useAssets();
   const live = usePrice(selected);
   const open = useOpenTrade();
+  const router = useRouter();
+  const session = useSession();
+  const authed = session.authed;
   const [stagedSide, setStagedSide] = useState<Side | null>(null);
 
   const { control, register, handleSubmit, setValue, watch } = useForm<Input>({
@@ -90,6 +95,10 @@ export function OrderPanel({ selected }: Props) {
 
   const confirm = async (): Promise<void> => {
     if (stagedSide === null) return;
+    if (!authed) {
+      router.push('/login?next=/webtrading');
+      return;
+    }
     await handleSubmit(async (data) => {
       try {
         const payload: OpenInput = {
@@ -254,6 +263,7 @@ export function OrderPanel({ selected }: Props) {
           decimals={decimals}
           displayDec={displayDec}
           submitting={open.isPending}
+          authed={authed}
           onConfirm={confirm}
           onCancel={() => setStagedSide(null)}
         />
@@ -333,6 +343,7 @@ function ConfirmCard({
   decimals,
   displayDec,
   submitting,
+  authed,
   onConfirm,
   onCancel,
 }: {
@@ -347,6 +358,7 @@ function ConfirmCard({
   decimals: number;
   displayDec: number;
   submitting: boolean;
+  authed: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -375,7 +387,9 @@ function ConfirmCard({
       >
         {submitting
           ? 'Opening…'
-          : `Confirm ${isBuy ? 'Buy' : 'Sell'} $${marginUsd.toFixed(2)} @ ${fmtPrice(openPrice, decimals, displayDec)}`}
+          : !authed
+            ? `Sign in to ${isBuy ? 'Buy' : 'Sell'} $${marginUsd.toFixed(2)} @ ${fmtPrice(openPrice, decimals, displayDec)}`
+            : `Confirm ${isBuy ? 'Buy' : 'Sell'} $${marginUsd.toFixed(2)} @ ${fmtPrice(openPrice, decimals, displayDec)}`}
       </button>
 
       <button
