@@ -28,6 +28,9 @@
     "typescript": "6.0.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "bcrypt", "esbuild", "prisma"]
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "bcrypt", "esbuild", "prisma"],
+    "overrides": {
+      "next>postcss": ">=8.5.10"
+    }
   }
 }
