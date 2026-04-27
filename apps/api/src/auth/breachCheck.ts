@@ -15,7 +15,10 @@ export async function isBreached(password: string): Promise<BreachResult> {
     const text = await res.text();
     for (const line of text.split('\n')) {
       const [hashSuffix, countStr] = line.trim().split(':');
-      if (hashSuffix === suffix) return { breached: true, count: Number(countStr) };
+      if (hashSuffix === suffix) {
+        // eslint-disable-next-line no-restricted-syntax -- HIBP wire format: string count, not monetary
+        return { breached: true, count: parseInt(countStr ?? '0', 10) };
+      }
     }
     return { breached: false, count: 0 };
   } catch {

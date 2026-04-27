@@ -9,7 +9,7 @@ const csp = [
     : "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
-  "connect-src 'self' ws://localhost:8001 wss:",
+  isDev ? "connect-src 'self' ws://localhost:8001 wss:" : "connect-src 'self' wss:",
   "font-src 'self' data:",
   "object-src 'none'",
   "base-uri 'self'",

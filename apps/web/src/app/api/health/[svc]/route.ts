@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 
-const PORTS: Record<string, number> = {
-  api: 9000,
-  ws: 9001,
-  poller: 9002,
-  uploader: 9003,
-  liq: 9004,
+type Endpoint = { host: string; port: number };
+
+const ENDPOINTS: Record<string, Endpoint> = {
+  api: { host: process.env.API_HEALTH_HOST ?? 'localhost', port: 9000 },
+  ws: { host: process.env.WS_HEALTH_HOST ?? 'localhost', port: 9001 },
+  poller: { host: process.env.POLLER_HEALTH_HOST ?? 'localhost', port: 9002 },
+  uploader: { host: process.env.UPLOADER_HEALTH_HOST ?? 'localhost', port: 9003 },
+  liq: { host: process.env.LIQ_HEALTH_HOST ?? 'localhost', port: 9004 },
 };
 
 export async function GET(
@@ -13,13 +15,13 @@ export async function GET(
   { params }: { params: Promise<{ svc: string }> },
 ): Promise<NextResponse> {
   const { svc } = await params;
-  const port = PORTS[svc];
-  if (port === undefined) {
+  const ep = ENDPOINTS[svc];
+  if (!ep) {
     return NextResponse.json({ error: 'unknown service' }, { status: 404 });
   }
   const start = Date.now();
   try {
-    const res = await fetch(`http://localhost:${port}/health`, { cache: 'no-store' });
+    const res = await fetch(`http://${ep.host}:${ep.port}/health`, { cache: 'no-store' });
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     return NextResponse.json(
       { ...body, _latencyMs: Date.now() - start },
