@@ -6,7 +6,15 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const SAFE_NEXT = new Set(['/webtrading', '/webtrading/health', '/webtrading/history']);
+type SafeRoute = '/webtrading' | '/webtrading/health' | '/webtrading/history';
+const SAFE_NEXT: ReadonlySet<SafeRoute> = new Set([
+  '/webtrading',
+  '/webtrading/health',
+  '/webtrading/history',
+]);
+function isSafeRoute(s: string | null): s is SafeRoute {
+  return s !== null && SAFE_NEXT.has(s as SafeRoute);
+}
 
 const Schema = z.object({
   email: z.email(),
@@ -22,7 +30,7 @@ export function AuthForm({ mode }: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const nextParam = params.get('next');
-  const next = nextParam && SAFE_NEXT.has(nextParam) ? nextParam : '/webtrading';
+  const next: SafeRoute = isSafeRoute(nextParam) ? nextParam : '/webtrading';
   const {
     register,
     handleSubmit,
