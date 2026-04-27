@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -b",
+    "build": "prisma generate && tsc -b",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --max-warnings 0",
     "prisma:pull": "prisma db pull",
