@@ -30,8 +30,23 @@ export function buildServer(): express.Express {
       credentials: true,
     }),
   );
+  app.use('/api/v1/user/signin', express.json({ limit: '8kb' }));
+  app.use('/api/v1/user/signup', express.json({ limit: '8kb' }));
+  app.use('/api/v1/auth', express.json({ limit: '8kb' }));
+  app.use('/api/v1/trade', express.json({ limit: '4kb' }));
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
+
+  let xffWarned = false;
+  app.use((req, _res, next) => {
+    if (xffWarned) return next();
+    const xff = req.header('x-forwarded-for');
+    if (xff && xff.split(',').length >= 2) {
+      xffWarned = true;
+      logger.warn({ xff }, 'X-Forwarded-For has 2+ hops with trust proxy=1; review proxy depth');
+    }
+    next();
+  });
   app.use(requestId);
   app.use(
     pinoHttp({

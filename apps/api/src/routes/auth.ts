@@ -3,6 +3,14 @@ import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import {
+  ACCESS_COOKIE,
+  ACCESS_COOKIE_MAX_AGE_MS,
+  ACCESS_COOKIE_PATH,
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_MAX_AGE_MS,
+  REFRESH_COOKIE_PATH,
+} from '../auth/cookies.js';
+import {
   signAccessToken,
   signRefreshToken,
   verifyAccessToken,
@@ -12,9 +20,6 @@ import { redis } from '../lib/redis.js';
 import { ApiError } from '../middleware/error.js';
 
 const WS_TICKET_TTL_SEC = 5;
-
-const ACCESS_COOKIE_MAX_AGE_MS = 15 * 60 * 1000;
-const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function nowSec(): number {
   return Math.floor(Date.now() / 1000);
@@ -28,28 +33,31 @@ async function denylist(token: string): Promise<void> {
 }
 
 function setAuthCookies(res: Response, access: string, refresh: string): void {
-  res.cookie('token', access, {
+  const secure = env.NODE_ENV === 'production';
+  res.cookie(ACCESS_COOKIE, access, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
+    secure,
     maxAge: ACCESS_COOKIE_MAX_AGE_MS,
-    path: '/',
+    path: ACCESS_COOKIE_PATH,
   });
-  res.cookie('refresh-token', refresh, {
+  res.cookie(REFRESH_COOKIE, refresh, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
+    secure,
     maxAge: REFRESH_COOKIE_MAX_AGE_MS,
-    path: '/api/v1/auth/refresh',
+    path: REFRESH_COOKIE_PATH,
   });
 }
 
+function readCookie(req: Request, name: string): string | null {
+  return (
+    (req as unknown as { cookies?: Record<string, string> }).cookies?.[name] ?? null
+  );
+}
+
 export async function refresh(req: Request, res: Response): Promise<void> {
-  const cookieToken =
-    (req as unknown as { cookies?: { 'refresh-token'?: string } }).cookies?.[
-      'refresh-token'
-    ] ?? null;
-  // Body fallback for non-browser clients that aren't carrying cookies.
+  const cookieToken = readCookie(req, REFRESH_COOKIE);
   const bodyToken =
     typeof req.body === 'object' && req.body !== null
       ? (req.body as { refreshToken?: string }).refreshToken
@@ -76,18 +84,12 @@ export async function refresh(req: Request, res: Response): Promise<void> {
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
-  // Best-effort denylist of whichever tokens are present. We never reject
-  // logout on a missing or already-expired token — the user wants out.
   const accessHeader = req.header('authorization');
-  const accessCookie =
-    (req as unknown as { cookies?: { token?: string } }).cookies?.token ?? null;
+  const accessCookie = readCookie(req, ACCESS_COOKIE);
   const accessToken = accessHeader?.startsWith('Bearer ')
     ? accessHeader.slice(7)
     : accessCookie;
-  const refreshCookie =
-    (req as unknown as { cookies?: { 'refresh-token'?: string } }).cookies?.[
-      'refresh-token'
-    ] ?? null;
+  const refreshCookie = readCookie(req, REFRESH_COOKIE);
 
   if (accessToken) {
     try {
@@ -106,8 +108,8 @@ export async function logout(req: Request, res: Response): Promise<void> {
     }
   }
 
-  res.clearCookie('token', { path: '/' });
-  res.clearCookie('refresh-token', { path: '/api/v1/auth/refresh' });
+  res.clearCookie(ACCESS_COOKIE, { path: ACCESS_COOKIE_PATH });
+  res.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
   res.status(200).json({ ok: true });
 }
 

@@ -1,10 +1,11 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { ACCESS_COOKIE } from '@/lib/cookies';
 import { API_URL } from '@/lib/env';
 
 export async function POST(): Promise<NextResponse> {
   const c = await cookies();
-  const token = c.get('token')?.value ?? null;
+  const token = c.get(ACCESS_COOKIE)?.value ?? null;
   if (!token) {
     return NextResponse.json(
       { error: { code: 'AUTH_REQUIRED', message: 'No token' } },

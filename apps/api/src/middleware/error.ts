@@ -29,7 +29,18 @@ export function errorMiddleware(
     res.status(err.status).json({ error: { code: err.code, message: err.message } });
     return;
   }
-  // final fallback; pino-http already logged the request
+  // body-parser surface: payload too large, malformed json, etc.
+  if (err && typeof err === 'object' && 'status' in err && 'type' in err) {
+    const e = err as { status: number; type: string; message?: string };
+    if (e.type === 'entity.too.large') {
+      res.status(413).json({ error: { code: 'INVALID_INPUT', message: 'Payload too large' } });
+      return;
+    }
+    if (e.type === 'entity.parse.failed') {
+      res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Malformed JSON' } });
+      return;
+    }
+  }
   console.error({ err, requestId: req.requestId }, 'unhandled error');
   res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
 }

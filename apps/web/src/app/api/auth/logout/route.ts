@@ -1,11 +1,20 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import {
+  ACCESS_COOKIE,
+  ACCESS_COOKIE_PATH,
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_PATH,
+} from '@/lib/cookies';
 import { API_URL } from '@/lib/env';
+
+const API_REFRESH_COOKIE =
+  process.env.NODE_ENV === 'production' ? '__Secure-refresh-token' : 'refresh-token';
 
 export async function POST(): Promise<NextResponse> {
   const c = await cookies();
-  const token = c.get('token')?.value ?? null;
-  const refreshToken = c.get('refresh-token')?.value ?? null;
+  const token = c.get(ACCESS_COOKIE)?.value ?? null;
+  const refreshToken = c.get(REFRESH_COOKIE)?.value ?? null;
 
   if (token || refreshToken) {
     try {
@@ -14,7 +23,7 @@ export async function POST(): Promise<NextResponse> {
         headers: {
           'content-type': 'application/json',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
-          ...(refreshToken ? { cookie: `refresh-token=${refreshToken}` } : {}),
+          ...(refreshToken ? { cookie: `${API_REFRESH_COOKIE}=${refreshToken}` } : {}),
         },
       });
     } catch (err) {
@@ -22,7 +31,7 @@ export async function POST(): Promise<NextResponse> {
     }
   }
 
-  c.delete({ name: 'token', path: '/' });
-  c.delete({ name: 'refresh-token', path: '/api/auth/refresh' });
+  c.delete({ name: ACCESS_COOKIE, path: ACCESS_COOKIE_PATH });
+  c.delete({ name: REFRESH_COOKIE, path: REFRESH_COOKIE_PATH });
   return NextResponse.json({ ok: true });
 }

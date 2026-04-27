@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { ACCESS_COOKIE } from './cookies';
 import { API_URL } from './env';
 
 export type Session = { userId: string };
@@ -10,7 +11,7 @@ export type Session = { userId: string };
  */
 export async function getSession(): Promise<Session | null> {
   const c = await cookies();
-  const token = c.get('token')?.value;
+  const token = c.get(ACCESS_COOKIE)?.value;
   if (!token) return null;
   try {
     const res = await fetch(`${API_URL}/api/v1/user/balance`, {

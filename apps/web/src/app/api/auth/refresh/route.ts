@@ -1,13 +1,18 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import {
+  ACCESS_COOKIE,
+  ACCESS_COOKIE_MAX_AGE_S,
+  ACCESS_COOKIE_PATH,
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_MAX_AGE_S,
+  REFRESH_COOKIE_PATH,
+} from '@/lib/cookies';
 import { API_URL } from '@/lib/env';
-
-const ACCESS_COOKIE_MAX_AGE_S = 15 * 60;
-const REFRESH_COOKIE_MAX_AGE_S = 7 * 24 * 60 * 60;
 
 export async function POST(): Promise<NextResponse> {
   const c = await cookies();
-  const refreshToken = c.get('refresh-token')?.value ?? null;
+  const refreshToken = c.get(REFRESH_COOKIE)?.value ?? null;
   if (!refreshToken) {
     return NextResponse.json({ message: 'No refresh token' }, { status: 401 });
   }
@@ -30,10 +35,8 @@ export async function POST(): Promise<NextResponse> {
   const payload = await upstream.json().catch(() => ({}));
   if (!upstream.ok) {
     if (upstream.status === 401) {
-      // Refresh token invalid/revoked → clear both cookies so the client
-      // doesn't keep retrying. Next request will hit signin again.
-      c.delete({ name: 'token', path: '/' });
-      c.delete({ name: 'refresh-token', path: '/api/auth/refresh' });
+      c.delete({ name: ACCESS_COOKIE, path: ACCESS_COOKIE_PATH });
+      c.delete({ name: REFRESH_COOKIE, path: REFRESH_COOKIE_PATH });
     }
     return NextResponse.json(payload, { status: upstream.status });
   }
@@ -48,19 +51,20 @@ export async function POST(): Promise<NextResponse> {
       { status: 502 },
     );
   }
-  c.set('token', token, {
+  const secure = process.env.NODE_ENV === 'production';
+  c.set(ACCESS_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     maxAge: ACCESS_COOKIE_MAX_AGE_S,
-    path: '/',
+    path: ACCESS_COOKIE_PATH,
   });
-  c.set('refresh-token', newRefresh, {
+  c.set(REFRESH_COOKIE, newRefresh, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     maxAge: REFRESH_COOKIE_MAX_AGE_S,
-    path: '/api/auth/refresh',
+    path: REFRESH_COOKIE_PATH,
   });
   return NextResponse.json({ ok: true });
 }

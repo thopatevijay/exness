@@ -2,10 +2,15 @@ import { env } from '@exness/config';
 import { getDb } from '@exness/db';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
+import {
+  ACCESS_COOKIE,
+  ACCESS_COOKIE_MAX_AGE_MS,
+  ACCESS_COOKIE_PATH,
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_MAX_AGE_MS,
+  REFRESH_COOKIE_PATH,
+} from './cookies.js';
 import { signAccessToken, signRefreshToken } from './jwt.js';
-
-const ACCESS_COOKIE_MAX_AGE_MS = 15 * 60 * 1000;
-const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Equalizes signin time when no user matches; prevents email enumeration via timing.
 const DUMMY_HASH = bcrypt.hashSync('dummy', 12);
@@ -21,25 +26,21 @@ export async function signin(req: Request, res: Response): Promise<void> {
   }
   const access = signAccessToken(user.id);
   const refresh = signRefreshToken(user.id);
+  const secure = env.NODE_ENV === 'production';
 
-  // Cookies are set on the api domain for non-browser clients (tests,
-  // direct-api calls). Browser sessions go through the web proxy which
-  // sets cookies on the web origin instead.
-  res.cookie('token', access.token, {
+  res.cookie(ACCESS_COOKIE, access.token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
+    secure,
     maxAge: ACCESS_COOKIE_MAX_AGE_MS,
-    path: '/',
+    path: ACCESS_COOKIE_PATH,
   });
-  res.cookie('refresh-token', refresh.token, {
+  res.cookie(REFRESH_COOKIE, refresh.token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
+    secure,
     maxAge: REFRESH_COOKIE_MAX_AGE_MS,
-    // Path-scope so the refresh cookie is only sent to the rotation
-    // endpoint, never on regular api requests.
-    path: '/api/v1/auth/refresh',
+    path: REFRESH_COOKIE_PATH,
   });
   res.status(200).json({ token: access.token, refreshToken: refresh.token });
 }

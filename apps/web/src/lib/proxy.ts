@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { ACCESS_COOKIE } from './cookies';
 import { API_URL } from './env';
 
 type ProxyOpts = {
@@ -19,7 +20,7 @@ export async function proxy(
   const headers: Record<string, string> = {};
   if (auth) {
     const c = await cookies();
-    const token = c.get('token')?.value;
+    const token = c.get(ACCESS_COOKIE)?.value;
     if (!token) {
       return NextResponse.json(
         { error: { code: 'AUTH_REQUIRED', message: 'No token' } },
