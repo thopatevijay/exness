@@ -8,6 +8,7 @@ import {
 } from '@exness/shared';
 import { signin } from '../auth/signin.js';
 import { signup } from '../auth/signup.js';
+import { logout, refresh } from './auth.js';
 import { requireAdmin } from '../middleware/admin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
@@ -43,6 +44,8 @@ const closeLimit = userRateLimit({ limit: 60, windowMs: 60_000 });
 // open to guests powering the showroom-mode trading view.
 router.post('/user/signup', signupLimit, validateBody(SignupSchema), signup);
 router.post('/user/signin', validateBody(SigninSchema), signin);
+router.post('/auth/refresh', refresh);
+router.post('/auth/logout', logout);
 router.get('/assets', getAssets);
 router.get('/candles', getCandles);
 

@@ -9,7 +9,8 @@ export const env = cleanEnv(process.env, {
   REDIS_URL: url(),
 
   JWT_SECRET: str({ desc: '32-byte hex; openssl rand -hex 32' }),
-  JWT_EXPIRY: str({ default: '24h' }),
+  JWT_EXPIRY: str({ default: '15m' }),
+  JWT_REFRESH_EXPIRY: str({ default: '7d' }),
 
   ALLOWED_ORIGINS: str({ default: '' }),
 

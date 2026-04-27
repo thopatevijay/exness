@@ -2,7 +2,10 @@ import { env } from '@exness/config';
 import { getDb } from '@exness/db';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
-import { signToken } from './jwt.js';
+import { signAccessToken, signRefreshToken } from './jwt.js';
+
+const ACCESS_COOKIE_MAX_AGE_MS = 15 * 60 * 1000;
+const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function signin(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body as { email: string; password: string };
@@ -16,15 +19,27 @@ export async function signin(req: Request, res: Response): Promise<void> {
     res.status(403).json({ message: 'Incorrect credentials' });
     return;
   }
-  const token = signToken(user.id);
-  // Cookie on api domain for non-browser clients (mobile, tests); the web
-  // proxies auth through its own routes and sets the cookie on its own origin.
-  res.cookie('token', token, {
+  const access = signAccessToken(user.id);
+  const refresh = signRefreshToken(user.id);
+
+  // Cookies are set on the api domain for non-browser clients (tests,
+  // direct-api calls). Browser sessions go through the web proxy which
+  // sets cookies on the web origin instead.
+  res.cookie('token', access.token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: ACCESS_COOKIE_MAX_AGE_MS,
     path: '/',
   });
-  res.status(200).json({ token });
+  res.cookie('refresh-token', refresh.token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.NODE_ENV === 'production',
+    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+    // Path-scope so the refresh cookie is only sent to the rotation
+    // endpoint, never on regular api requests.
+    path: '/api/v1/auth/refresh',
+  });
+  res.status(200).json({ token: access.token, refreshToken: refresh.token });
 }
